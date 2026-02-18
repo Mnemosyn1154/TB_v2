@@ -1,7 +1,9 @@
 "use client";
 
-import { RefreshCw, Loader2 } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LoadingSpinner } from "@/components/common/loading-spinner";
+import { LastUpdated } from "@/components/common/last-updated";
 import { usePortfolio } from "@/hooks/use-portfolio";
 import { PortfolioKPIs } from "./portfolio-kpis";
 import { StrategyCards } from "./strategy-cards";
@@ -9,14 +11,10 @@ import { HoldingsTable } from "./holdings-table";
 import { RiskIndicators } from "./risk-indicators";
 
 export function PortfolioTab() {
-  const { data, error, loading, refetch } = usePortfolio();
+  const { data, error, loading, lastUpdated, refetch } = usePortfolio();
 
   if (loading && !data) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   if (error && !data) {
@@ -36,7 +34,10 @@ export function PortfolioTab() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">자산 현황</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold">자산 현황</h2>
+          <LastUpdated timestamp={lastUpdated} />
+        </div>
         <Button
           variant="ghost"
           size="sm"

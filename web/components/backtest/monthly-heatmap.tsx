@@ -54,7 +54,7 @@ export function MonthlyHeatmap({ index, columns, data }: MonthlyHeatmapProps) {
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-xs">
+          <table className="w-full min-w-[600px] border-collapse text-xs">
             <thead>
               <tr>
                 <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">

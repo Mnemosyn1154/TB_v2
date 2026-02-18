@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { DashboardHeader } from "@/components/layout/dashboard-header";
+import { ErrorBoundary } from "@/components/common/error-boundary";
 import { PortfolioTab } from "@/components/portfolio/portfolio-tab";
 import { BenchmarkTab } from "@/components/benchmark/benchmark-tab";
 import { StrategyTab } from "@/components/strategy/strategy-tab";
@@ -16,12 +17,14 @@ export default function Home() {
       <DashboardHeader activeTab={activeTab} onTabChange={setActiveTab} />
 
       <main className="mx-auto max-w-7xl px-4 py-6">
-        {activeTab === "portfolio" && <PortfolioTab />}
-        {activeTab === "benchmark" && <BenchmarkTab />}
-        {activeTab === "strategy" && <StrategyTab />}
-        {activeTab === "backtest" && <BacktestTab />}
-        {activeTab === "paper" && <PlaceholderTab name="모의거래" />}
-        {activeTab === "control" && <PlaceholderTab name="실행 & 제어" />}
+        <ErrorBoundary>
+          {activeTab === "portfolio" && <PortfolioTab />}
+          {activeTab === "benchmark" && <BenchmarkTab />}
+          {activeTab === "strategy" && <StrategyTab />}
+          {activeTab === "backtest" && <BacktestTab />}
+          {activeTab === "paper" && <PlaceholderTab name="모의거래" />}
+          {activeTab === "control" && <PlaceholderTab name="실행 & 제어" />}
+        </ErrorBoundary>
       </main>
     </div>
   );

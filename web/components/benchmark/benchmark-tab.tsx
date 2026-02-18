@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { useBenchmark } from "@/hooks/use-benchmark";
 import { PeriodSelector } from "./period-selector";
 import { BenchmarkChart } from "./benchmark-chart";
@@ -13,11 +13,7 @@ export function BenchmarkTab() {
   const { data, error, loading, period, changePeriod } = useBenchmark();
 
   if (loading && !data) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   if (error && !data) {

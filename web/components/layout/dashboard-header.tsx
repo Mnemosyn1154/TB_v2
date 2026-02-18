@@ -10,9 +10,13 @@ import {
   Play,
   Sun,
   Moon,
+  ShieldAlert,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { TABS, type TabKey } from "@/lib/constants";
+import { useBotStatus } from "@/hooks/use-bot-status";
 
 const ICON_MAP = {
   BarChart3,
@@ -33,12 +37,34 @@ export function DashboardHeader({
   onTabChange,
 }: DashboardHeaderProps) {
   const { theme, setTheme } = useTheme();
+  const botStatus = useBotStatus();
 
   return (
     <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
-        {/* Logo */}
-        <h1 className="text-lg font-bold tracking-tight">D2trader</h1>
+        {/* Logo + Status */}
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg font-bold tracking-tight">D2trader</h1>
+          {botStatus && (
+            <div className="hidden sm:flex items-center gap-1.5">
+              <Badge
+                variant={botStatus.mode === "live" ? "default" : "secondary"}
+                className="text-[10px] px-1.5 py-0"
+              >
+                {botStatus.mode === "live"
+                  ? "실거래"
+                  : botStatus.mode === "paper"
+                    ? "모의"
+                    : "대기"}
+              </Badge>
+              {botStatus.kill_switch ? (
+                <ShieldAlert className="h-4 w-4 text-destructive" />
+              ) : (
+                <ShieldCheck className="h-4 w-4 text-success" />
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Tabs */}
         <nav className="hidden md:flex items-center gap-1">
