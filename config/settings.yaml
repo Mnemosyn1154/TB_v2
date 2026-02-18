@@ -7,11 +7,6 @@ strategies:
   stat_arb:
     enabled: true
     pairs:
-      - name: Samsung_Hynix
-        market: KR
-        stock_a: '005930'
-        stock_b: '000660'
-        hedge_etf: '114800'
       - name: MSFT_GOOGL
         market: US
         stock_a: MSFT
@@ -185,6 +180,21 @@ strategies:
         market: US
         name: Mastercard
         exchange: NYS
+  sam_hynix:
+    enabled: true
+    pairs:
+      - name: Samsung_Hynix
+        market: KR
+        stock_a: '005930'
+        stock_b: '000660'
+        hedge_etf: '114800'
+    lookback_window: 60
+    entry_z_score: 2
+    exit_z_score: 0.5
+    stop_loss_z_score: 3.5
+    recalc_beta_days: 30
+    coint_pvalue: 0.05
+    type: stat_arb
 risk:
   max_position_pct: 10
   stop_loss_pct: -7

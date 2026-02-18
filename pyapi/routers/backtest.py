@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import json
+import math
+
 from fastapi import APIRouter, Depends
+from starlette.responses import Response
 
 from pyapi.deps import verify_secret
 from pyapi.schemas import BacktestRequest
@@ -8,8 +12,46 @@ from pyapi.schemas import BacktestRequest
 router = APIRouter(prefix="/py/backtest", tags=["backtest"])
 
 
+class _SafeEncoder(json.JSONEncoder):
+    """inf/NaN → null, numpy/pandas 타입 → native"""
+    def default(self, o):
+        import numpy as np
+        import pandas as pd
+        if isinstance(o, (np.integer,)):
+            return int(o)
+        if isinstance(o, (np.floating,)):
+            v = float(o)
+            return None if math.isnan(v) or math.isinf(v) else v
+        if isinstance(o, np.ndarray):
+            return self._sanitize(o.tolist())
+        if isinstance(o, pd.DataFrame):
+            return self._sanitize(o.to_dict(orient="list"))
+        if isinstance(o, pd.Series):
+            return self._sanitize(o.tolist())
+        return super().default(o)
+
+    def encode(self, o):
+        return super().encode(self._sanitize(o))
+
+    def _sanitize(self, o):
+        if isinstance(o, float):
+            return None if math.isnan(o) or math.isinf(o) else o
+        if isinstance(o, dict):
+            return {k: self._sanitize(v) for k, v in o.items()}
+        if isinstance(o, (list, tuple)):
+            return [self._sanitize(v) for v in o]
+        return o
+
+
+def _json_response(data: dict) -> Response:
+    """inf/NaN을 null로 치환하는 JSON 응답"""
+    body = json.dumps(data, cls=_SafeEncoder, ensure_ascii=False)
+    return Response(content=body, media_type="application/json")
+
+
 def _to_native(obj):
-    """numpy/pandas 타입 → Python 네이티브 타입으로 재귀 변환"""
+    """numpy/pandas 타입 → Python 네이티브 타입으로 재귀 변환 (inf/NaN → None)"""
+    import math
     import numpy as np
 
     if isinstance(obj, dict):
@@ -19,9 +61,12 @@ def _to_native(obj):
     if isinstance(obj, (np.integer,)):
         return int(obj)
     if isinstance(obj, (np.floating,)):
-        return float(obj)
+        v = float(obj)
+        return None if math.isnan(v) or math.isinf(v) else v
+    if isinstance(obj, float):
+        return None if math.isnan(obj) or math.isinf(obj) else obj
     if isinstance(obj, np.ndarray):
-        return obj.tolist()
+        return _to_native(obj.tolist())
     return obj
 
 
@@ -89,9 +134,9 @@ def run_backtest(req: BacktestRequest, secret: None = Depends(verify_secret)):
             slippage_rate=req.slippage_rate,
             pair_name=req.pair_name,
         )
-        return {"data": _serialize_result(result, metrics), "error": None}
+        return _json_response({"data": _serialize_result(result, metrics), "error": None})
     except Exception as e:
-        return {"data": None, "error": str(e)}
+        return _json_response({"data": None, "error": str(e)})
 
 
 @router.post("/run-per-pair")
@@ -111,9 +156,9 @@ def run_backtest_per_pair(req: BacktestRequest, secret: None = Depends(verify_se
         data = {}
         for pair_name, (result, metrics) in results.items():
             data[pair_name] = _serialize_result(result, metrics)
-        return {"data": data, "error": None}
+        return _json_response({"data": data, "error": None})
     except Exception as e:
-        return {"data": None, "error": str(e)}
+        return _json_response({"data": None, "error": str(e)})
 
 
 @router.get("/pairs/{strategy}")
