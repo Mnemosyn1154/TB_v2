@@ -179,8 +179,8 @@ def _get_current_price(code: str, market: str) -> float:
             exchange = get_us_exchange(code)
             data = broker.get_us_price(code, exchange=exchange)
             return float(data["price"])
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"KIS 가격 조회 실패: {code} — {e}")
 
     # yfinance 폴백
     try:
@@ -192,8 +192,8 @@ def _get_current_price(code: str, market: str) -> float:
         hist = ticker.history(period="1d")
         if not hist.empty:
             return float(hist["Close"].iloc[-1])
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"yfinance 가격 조회 실패: {code} — {e}")
 
     return 0.0
 

@@ -79,27 +79,6 @@ class DataManager:
                     reason TEXT
                 )
             """))
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS sim_positions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    code TEXT NOT NULL UNIQUE,
-                    market TEXT NOT NULL,
-                    side TEXT NOT NULL DEFAULT 'LONG',
-                    quantity INTEGER NOT NULL,
-                    entry_price REAL NOT NULL,
-                    current_price REAL NOT NULL DEFAULT 0,
-                    strategy TEXT NOT NULL DEFAULT '',
-                    entry_time TEXT NOT NULL,
-                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-                )
-            """))
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS sim_portfolio (
-                    key TEXT PRIMARY KEY,
-                    value TEXT NOT NULL,
-                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-                )
-            """))
             conn.commit()
 
     # ──────────────────────────────────────────────

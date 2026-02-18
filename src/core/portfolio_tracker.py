@@ -1,5 +1,6 @@
-"""
-AlgoTrader KR — 시뮬레이션 포트폴리오 트래커
+from __future__ import annotations
+
+"""AlgoTrader KR — 시뮬레이션 포트폴리오 트래커
 
 시뮬레이션 모드에서 포지션과 현금을 SQLite에 영속화합니다.
 DataManager의 DB 엔진을 공유하여 trading_bot.db에 저장합니다.

@@ -1,5 +1,5 @@
 simulation:
-  enabled: true
+  enabled: false
   initial_capital: 10000000
 kis:
   base_url: https://openapi.koreainvestment.com:9443
