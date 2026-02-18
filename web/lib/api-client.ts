@@ -51,7 +51,20 @@ export const getSignals = () => fetchApi("/signals");
 
 // Paper Trading
 export const getPaperSessions = () => fetchApi("/paper/sessions");
+export const getActivePaperSession = () => fetchApi("/paper/sessions/active");
 export const createPaperSession = () =>
   fetchApi("/paper/sessions", { method: "POST" });
-export const executeAllSignals = () =>
-  fetchApi("/paper/execute-all", { method: "POST" });
+export const stopPaperSession = (id: string) =>
+  fetchApi(`/paper/sessions/${id}/stop`, { method: "POST" });
+export const getPaperTrades = (id: string) =>
+  fetchApi(`/paper/sessions/${id}/trades`);
+export const getPaperSummary = (id: string) =>
+  fetchApi(`/paper/sessions/${id}/summary`);
+export const executePaperSignals = (sessionId: string, signalIndex?: number) =>
+  fetchApi("/paper/execute", {
+    method: "POST",
+    body: JSON.stringify({
+      session_id: sessionId,
+      signal_index: signalIndex ?? null,
+    }),
+  });
