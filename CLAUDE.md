@@ -72,7 +72,7 @@ D2trader — 한국/미국 주식 알고리즘 트레이딩 대시보드.
 KIS Open API(한국투자증권)를 통해 3개 전략(stat_arb, dual_momentum, quant_factor)을 자동 매매하며,
 Next.js 웹 대시보드에서 포트폴리오 모니터링, 백테스트, 페이퍼 트레이딩, 봇 제어를 수행한다.
 
-- **백엔드**: Python 3.x + FastAPI (pyapi/) + 코어 엔진 (src/)
+- **백엔드**: Python 3.12 + FastAPI (pyapi/) + 코어 엔진 (src/)
 - **프론트엔드**: Next.js 16 + React 19 + TypeScript 5.9 + Tailwind 4 + shadcn/ui
 - **DB**: SQLite (data/trading_bot.db)
 - **배포**: Cloudflare Pages + Tunnel, systemd, GitHub Actions
@@ -183,7 +183,8 @@ python3 main.py backtest-yf -s stat_arb --start 2020-01-01 --end 2024-12-31
 
 - **Phase 1-9**: 모두 구현 완료 (docs/mainplan.md 참조)
 - **벤치마크 탭**: Python API 경유 DB 캐시 + yfinance 보충 (pyapi/routers/benchmark.py)
-- **시뮬레이션 모드**: SQLite 기반 가상 포트폴리오 (기본 OFF, `simulation.enabled` 토글)
+- **시뮬레이션 모드**: SQLite 기반 가상 포트폴리오 (기본 ON, `simulation.enabled` 토글)
+- **Python 3.12**: pyenv로 3.12.12 사용 (`.python-version`), 3.10+ 타입 문법 지원
 - **quant_factor 전략**: settings.yaml에서 disabled (enabled: false)
 - **테스트**: 미구현 (테스트 플랜은 docs/TEST_PLAN.md에 작성됨)
 - **Settings API**: Python API 없이 Next.js에서 settings.yaml 직접 읽기/쓰기
