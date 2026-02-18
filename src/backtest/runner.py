@@ -305,7 +305,7 @@ class BacktestRunner:
         start_date: str,
         end_date: str,
     ) -> dict[str, pd.DataFrame]:
-        """yfinance에서 룩백 포함 데이터 로드"""
+        """yfinance에서 룩백 포함 데이터 로드 (DB에 캐시)"""
         feed = DataFeed()
         fetch_start = pd.to_datetime(start_date) - pd.Timedelta(days=self.LOOKBACK_EXTRA)
 
@@ -313,7 +313,15 @@ class BacktestRunner:
         for item in strategy.required_codes():
             symbols[item["code"]] = item["market"]
 
-        return feed.fetch_multiple(symbols, str(fetch_start.date()), end_date)
+        result = feed.fetch_multiple(symbols, str(fetch_start.date()), end_date)
+
+        # Cache to SQLite for subsequent runs
+        for code, df in result.items():
+            saved = save_prices_to_db(df)
+            if saved > 0:
+                logger.info(f"yfinance 데이터 DB 캐시: {code} — {saved}건")
+
+        return result
 
     def _has_enough_lookback(
         self,
@@ -352,7 +360,7 @@ class BacktestRunner:
 # DB 유틸리티 (대시보드 서비스에서 이전)
 # ──────────────────────────────────────────────
 
-def _get_db_engine():
+def get_db_engine():
     """SQLite 엔진"""
     db_path = DATA_DIR / "trading_bot.db"
     return create_engine(f"sqlite:///{db_path}")
@@ -360,7 +368,7 @@ def _get_db_engine():
 
 def _load_prices_from_db(code: str, market: str) -> pd.DataFrame:
     """SQLite에서 종가 데이터 로드"""
-    engine = _get_db_engine()
+    engine = get_db_engine()
     query = text("""
         SELECT date, open, high, low, close, volume
         FROM daily_prices
@@ -375,3 +383,40 @@ def _load_prices_from_db(code: str, market: str) -> pd.DataFrame:
     if not df.empty:
         df["date"] = pd.to_datetime(df["date"])
     return df
+
+
+def save_prices_to_db(df: pd.DataFrame) -> int:
+    """yfinance 데이터를 SQLite에 캐시 (중복 무시)"""
+    if df.empty:
+        return 0
+
+    engine = get_db_engine()
+
+    records = []
+    for _, row in df.iterrows():
+        try:
+            date_val = row["date"]
+            records.append({
+                "code": row["code"],
+                "market": row["market"],
+                "date": date_val.strftime("%Y-%m-%d") if hasattr(date_val, "strftime") else str(date_val)[:10],
+                "open": float(row["open"]),
+                "high": float(row["high"]),
+                "low": float(row["low"]),
+                "close": float(row["close"]),
+                "volume": int(row["volume"]),
+            })
+        except Exception:
+            continue
+
+    if not records:
+        return 0
+
+    with engine.connect() as conn:
+        conn.execute(text("""
+            INSERT OR IGNORE INTO daily_prices (code, market, date, open, high, low, close, volume)
+            VALUES (:code, :market, :date, :open, :high, :low, :close, :volume)
+        """), records)
+        conn.commit()
+
+    return len(records)

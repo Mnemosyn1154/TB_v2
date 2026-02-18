@@ -1,19 +1,5 @@
 import { type NextRequest } from "next/server";
-import YahooFinance from "yahoo-finance2";
-
-const yahooFinance = new (YahooFinance as any)();
-
-const PERIOD_DAYS: Record<string, number> = {
-  "1M": 30,
-  "3M": 90,
-  "6M": 180,
-  "1Y": 365,
-  ALL: 365 * 3,
-};
-
-function toDateStr(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
+import { pythonGet } from "@/lib/python-proxy";
 
 /** 가격 배열 → 100 기준 정규화 */
 function normalize(prices: number[]): number[] {
@@ -55,41 +41,27 @@ function calcBeta(portRet: number[], benchRet: number[]): number {
   return varB === 0 ? 0 : cov / varB;
 }
 
-async function fetchHistory(symbol: string, startDate: Date, endDate: Date) {
-  try {
-    const result = await yahooFinance.chart(symbol, {
-      period1: startDate,
-      period2: endDate,
-      interval: "1d",
-    });
-    const quotes = result.quotes ?? [];
-    const dates: string[] = [];
-    const prices: number[] = [];
-    for (const q of quotes) {
-      if (q.close != null && q.date) {
-        dates.push(toDateStr(new Date(q.date)));
-        prices.push(q.close);
-      }
-    }
-    return { dates, prices };
-  } catch {
-    return { dates: [] as string[], prices: [] as number[] };
-  }
+interface BenchmarkRaw {
+  data: {
+    kospi: { dates: string[]; prices: number[] };
+    sp500: { dates: string[]; prices: number[] };
+  };
+  error: string | null;
 }
 
 export async function GET(request: NextRequest) {
   const period = request.nextUrl.searchParams.get("period") || "3M";
-  const days = PERIOD_DAYS[period] ?? 90;
-
-  const endDate = new Date();
-  const startDate = new Date();
-  startDate.setDate(endDate.getDate() - days);
 
   try {
-    const [kospi, sp500] = await Promise.all([
-      fetchHistory("^KS11", startDate, endDate),
-      fetchHistory("^GSPC", startDate, endDate),
-    ]);
+    const res = (await pythonGet(
+      `/py/benchmark/data?period=${encodeURIComponent(period)}`
+    )) as BenchmarkRaw;
+
+    if (res.error) {
+      return Response.json({ data: null, error: res.error }, { status: 500 });
+    }
+
+    const { kospi, sp500 } = res.data;
 
     // 날짜 기준은 KOSPI (거래일 기준)
     const dates = kospi.dates.length > 0 ? kospi.dates : sp500.dates;

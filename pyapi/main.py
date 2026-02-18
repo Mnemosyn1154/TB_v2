@@ -14,7 +14,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from pyapi.routers import portfolio, backtest, bot, signals, paper
+from pyapi.routers import portfolio, backtest, bot, signals, paper, benchmark
 
 app = FastAPI(title="D2trader Python API", version="0.1.0")
 
@@ -38,6 +38,7 @@ app.include_router(backtest.router)
 app.include_router(bot.router)
 app.include_router(signals.router)
 app.include_router(paper.router)
+app.include_router(benchmark.router)
 
 
 @app.get("/py/health")
