@@ -44,7 +44,7 @@ from src.strategies.base import TradeSignal, Signal
 # ──────────────────────────────────────────────
 
 def _init_paper_tables() -> None:
-    """모의 거래 추적 테이블 생성 (없으면)"""
+    """모의 거래 추적 테이블 생성 (없으면) + 마이그레이션"""
     engine = _get_db_engine()
     with engine.begin() as conn:
         conn.execute(text("""
@@ -55,6 +55,8 @@ def _init_paper_tables() -> None:
                 status TEXT NOT NULL DEFAULT 'active',
                 strategy_names TEXT,
                 memo TEXT DEFAULT '',
+                initial_capital REAL NOT NULL DEFAULT 0,
+                cash REAL NOT NULL DEFAULT 0,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         """))
@@ -74,6 +76,12 @@ def _init_paper_tables() -> None:
                 FOREIGN KEY (session_id) REFERENCES paper_sessions(session_id)
             )
         """))
+        # 마이그레이션: 기존 테이블에 컬럼 없으면 추가
+        try:
+            conn.execute(text("SELECT initial_capital FROM paper_sessions LIMIT 1"))
+        except Exception:
+            conn.execute(text("ALTER TABLE paper_sessions ADD COLUMN initial_capital REAL NOT NULL DEFAULT 0"))
+            conn.execute(text("ALTER TABLE paper_sessions ADD COLUMN cash REAL NOT NULL DEFAULT 0"))
 
 
 # ──────────────────────────────────────────────
@@ -95,18 +103,28 @@ def create_session() -> dict:
     strategies = _build_strategies()
     strategy_names = [s.name for s in strategies]
 
+    config = get_config()
+    sim_config = config.get("simulation", {})
+    initial_capital = float(sim_config.get(
+        "initial_capital",
+        config.get("backtest", {}).get("initial_capital", 10_000_000),
+    ))
+
     engine = _get_db_engine()
     with engine.begin() as conn:
         conn.execute(text("""
-            INSERT INTO paper_sessions (session_id, start_date, status, strategy_names)
-            VALUES (:sid, :start, 'active', :strategies)
+            INSERT INTO paper_sessions
+                (session_id, start_date, status, strategy_names, initial_capital, cash)
+            VALUES (:sid, :start, 'active', :strategies, :capital, :cash)
         """), {
             "sid": session_id,
             "start": now,
             "strategies": json.dumps(strategy_names),
+            "capital": initial_capital,
+            "cash": initial_capital,
         })
 
-    logger.info(f"모의 거래 세션 생성: {session_id}")
+    logger.info(f"모의 거래 세션 생성: {session_id} (자본금 {initial_capital:,.0f})")
     return get_active_session()
 
 
@@ -253,8 +271,29 @@ def execute_signal(session_id: str, signal_dict: dict) -> dict:
             simulation_mode=sim_enabled,
         )
 
+        # 페이퍼 세션 잔고 검증 (BUY만)
+        session_cash = _get_session_cash(session_id)
+        if signal.signal == Signal.BUY:
+            est_price = signal.price or executor.get_current_price(signal.code, signal.market)
+            est_qty = signal.quantity or rm.calculate_position_size(est_price, signal.market)
+            cost = est_price * est_qty
+            if session_cash is not None and cost > session_cash:
+                return {
+                    "error": f"잔고 부족: 필요 {cost:,.0f}, 보유 {session_cash:,.0f}",
+                    "code": signal.code,
+                }
+
         # 단일 시그널 실행 (OrderExecutor가 리스크 검증 + 주문 + 기록 처리)
         executor.execute_signals([signal])
+
+        # 페이퍼 세션 잔고 업데이트
+        exec_price = signal.price or executor.get_current_price(signal.code, signal.market)
+        exec_qty = signal.quantity or rm.calculate_position_size(exec_price, signal.market)
+        trade_value = exec_price * exec_qty
+        if signal.signal == Signal.BUY:
+            _update_session_cash(session_id, -trade_value)
+        elif signal.signal in (Signal.SELL, Signal.CLOSE):
+            _update_session_cash(session_id, trade_value)
 
         # 모의 거래 이력 DB 기록
         _save_paper_trade(session_id, signal)
@@ -280,6 +319,27 @@ def execute_all_signals(session_id: str, signal_dicts: list[dict]) -> list[dict]
         result = execute_signal(session_id, sig_dict)
         results.append(result)
     return results
+
+
+def _get_session_cash(session_id: str) -> float | None:
+    """세션의 현재 잔고 조회"""
+    engine = _get_db_engine()
+    with engine.connect() as conn:
+        row = conn.execute(
+            text("SELECT cash FROM paper_sessions WHERE session_id = :sid"),
+            {"sid": session_id},
+        ).fetchone()
+    return float(row[0]) if row else None
+
+
+def _update_session_cash(session_id: str, delta: float) -> None:
+    """세션 잔고 증감 (delta > 0: 입금, < 0: 출금)"""
+    engine = _get_db_engine()
+    with engine.begin() as conn:
+        conn.execute(text("""
+            UPDATE paper_sessions SET cash = cash + :delta
+            WHERE session_id = :sid
+        """), {"sid": session_id, "delta": delta})
 
 
 def _save_paper_trade(session_id: str, signal: TradeSignal) -> None:
@@ -340,7 +400,8 @@ def get_session_history() -> list[dict]:
     _init_paper_tables()
     engine = _get_db_engine()
     query = text("""
-        SELECT session_id, start_date, end_date, status, strategy_names
+        SELECT session_id, start_date, end_date, status, strategy_names,
+               initial_capital, cash
         FROM paper_sessions
         ORDER BY created_at DESC
     """)

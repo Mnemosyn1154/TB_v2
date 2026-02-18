@@ -56,8 +56,44 @@ class DataCollector:
 
         logger.info("DataCollector 초기화 완료")
 
+    @staticmethod
+    def _check_market_hours() -> None:
+        """현재 시간 기준 장 운영 상태 경고 (정보성, 수집은 계속 진행)"""
+        import pytz
+
+        now_utc = datetime.utcnow()
+
+        # KR: KST 09:00-15:30, 월-금
+        kst = pytz.timezone("Asia/Seoul")
+        now_kst = datetime.now(kst)
+        kr_weekday = now_kst.weekday() < 5
+        kr_open = 9 * 60  # 09:00
+        kr_close = 15 * 60 + 30  # 15:30
+        kr_minutes = now_kst.hour * 60 + now_kst.minute
+        kr_in_session = kr_weekday and kr_open <= kr_minutes <= kr_close
+
+        # US: EST 09:30-16:00, 월-금
+        est = pytz.timezone("US/Eastern")
+        now_est = datetime.now(est)
+        us_weekday = now_est.weekday() < 5
+        us_open = 9 * 60 + 30  # 09:30
+        us_close = 16 * 60  # 16:00
+        us_minutes = now_est.hour * 60 + now_est.minute
+        us_in_session = us_weekday and us_open <= us_minutes <= us_close
+
+        if not kr_weekday:
+            logger.warning(f"KR 장 휴일 (주말): {now_kst.strftime('%Y-%m-%d %A')}")
+        elif not kr_in_session:
+            logger.info(f"KR 장외 시간: {now_kst.strftime('%H:%M')} KST (09:00-15:30)")
+
+        if not us_weekday:
+            logger.warning(f"US 장 휴일 (주말): {now_est.strftime('%Y-%m-%d %A')}")
+        elif not us_in_session:
+            logger.info(f"US 장외 시간: {now_est.strftime('%H:%M')} EST (09:30-16:00)")
+
     def collect_all(self) -> None:
         """모든 활성 전략에 필요한 데이터를 일괄 수집합니다."""
+        self._check_market_hours()
         logger.info("📥 데이터 수집 시작...")
 
         # 전략별 required_codes()를 합산 → 중복 제거
@@ -106,3 +142,30 @@ class DataCollector:
                         logger.warning(f"  ⚠ yfinance fallback 실패: {code} ({market}) — {yf_err}")
 
         logger.info(f"✅ 데이터 수집 완료 ({success}/{len(all_codes)}종목)")
+
+        # 데이터 신선도 검증
+        self._check_data_freshness(all_codes)
+
+    def _check_data_freshness(self, all_codes: dict[str, dict[str, str]]) -> None:
+        """수집된 데이터의 최신 날짜 확인, 3일 이상 갭이면 경고"""
+        from sqlalchemy import text
+
+        today = datetime.now().date()
+        stale_codes = []
+        for code, info in all_codes.items():
+            market = info["market"]
+            try:
+                with self.data_manager.engine.connect() as conn:
+                    row = conn.execute(text(
+                        "SELECT MAX(date) FROM daily_prices WHERE code = :code AND market = :market"
+                    ), {"code": code, "market": market}).fetchone()
+                if row and row[0]:
+                    latest = datetime.strptime(row[0], "%Y-%m-%d").date()
+                    gap = (today - latest).days
+                    if gap >= 3:
+                        stale_codes.append(f"{code}({market}, {gap}일 전)")
+            except Exception:
+                pass
+
+        if stale_codes:
+            logger.warning(f"⚠ 데이터 신선도 경고 (3일+ 갭): {', '.join(stale_codes)}")
