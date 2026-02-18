@@ -22,6 +22,12 @@ const KNOWN_LABELS: Record<string, string> = {
   lookback_days: "Value 룩백 (거래일)",
   momentum_days: "Momentum 룩백 (거래일)",
   volatility_days: "변동성 윈도우 (일)",
+  kr_etf: "KR ETF 코드",
+  us_etf: "US ETF 코드",
+  us_etf_exchange: "US ETF 거래소",
+  safe_kr_etf: "안전자산 KR ETF",
+  safe_us_etf: "안전자산 US ETF",
+  safe_us_etf_exchange: "안전자산 US ETF 거래소",
 };
 
 export function fieldLabel(field: string): string {
@@ -49,6 +55,22 @@ export function extractNumericParams(
       field,
       label: fieldLabel(field),
       value: val as number,
+    }));
+}
+
+/** Extract editable string params from a strategy config (excludes 'type') */
+export function extractStringParams(
+  config: Record<string, unknown>
+): { field: string; label: string; value: string }[] {
+  return Object.entries(config)
+    .filter(
+      ([key, val]) =>
+        typeof val === "string" && key !== "type" && !EXCLUDED_FIELDS.has(key)
+    )
+    .map(([field, val]) => ({
+      field,
+      label: fieldLabel(field),
+      value: val as string,
     }));
 }
 
