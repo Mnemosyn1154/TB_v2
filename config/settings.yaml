@@ -1,3 +1,6 @@
+simulation:
+  enabled: false
+  initial_capital: 10000000
 kis:
   base_url: https://openapi.koreainvestment.com:9443
   paper_url: https://openapivts.koreainvestment.com:29443

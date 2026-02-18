@@ -41,4 +41,5 @@ export interface PortfolioData {
   us: MarketBalance;
   risk: RiskSummary;
   strategies?: StrategyStatus[];
+  initial_capital?: number;
 }
