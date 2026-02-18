@@ -163,8 +163,13 @@ class StatArbStrategy(BaseStrategy):
             prices_b = price_data.get(pair.stock_b)
 
             if prices_a is None or prices_b is None:
+                logger.warning(f"[{self.name}] 페어 {pair.name} 스킵: 가격 데이터 없음")
                 continue
             if len(prices_a) < 60 or len(prices_b) < 60:
+                logger.warning(
+                    f"[{self.name}] 페어 {pair.name} 스킵: 데이터 부족 — "
+                    f"A={len(prices_a)}일, B={len(prices_b)}일 (최소 60일)"
+                )
                 continue
 
             pair_data[pair.name] = {
@@ -173,6 +178,7 @@ class StatArbStrategy(BaseStrategy):
             }
 
         if not pair_data:
+            logger.warning(f"[{self.name}] 시그널 스킵: 유효한 페어 없음")
             return {}
         return {"pair_data": pair_data}
 

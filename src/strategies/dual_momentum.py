@@ -97,11 +97,21 @@ class DualMomentumStrategy(BaseStrategy):
         us_prices = price_data.get(self.us_etf)
 
         if kr_prices is None or us_prices is None:
+            missing = []
+            if kr_prices is None:
+                missing.append(self.kr_etf)
+            if us_prices is None:
+                missing.append(self.us_etf)
+            logger.warning(f"[{self.name}] 시그널 스킵: 가격 데이터 없음 — {missing}")
             return {}
 
         # 최소 60일 이상이면 진행 (가용 데이터로 수익률 계산)
         min_required = 60
         if len(kr_prices) < min_required or len(us_prices) < min_required:
+            logger.warning(
+                f"[{self.name}] 시그널 스킵: 데이터 부족 — "
+                f"KR {len(kr_prices)}일, US {len(us_prices)}일 (최소 {min_required}일)"
+            )
             return {}
 
         return {"kr_prices": kr_prices, "us_prices": us_prices}

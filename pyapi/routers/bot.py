@@ -25,8 +25,8 @@ def run_once(secret: None = Depends(verify_secret)):
     from dashboard.services.bot_service import run_once
 
     try:
-        log = run_once()
-        return {"data": {"log": log}, "error": None}
+        result = run_once()
+        return {"data": result, "error": None}
     except Exception as e:
         return {"data": None, "error": str(e)}
 

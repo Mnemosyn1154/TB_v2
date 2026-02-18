@@ -65,13 +65,14 @@ def _run_strategy(strategy: BaseStrategy, dm) -> list:
 
     kwargs = strategy.prepare_signal_kwargs(price_data)
     if not kwargs:
+        logger.warning(f"{strategy.name}: prepare_signal_kwargs 빈 반환 (시그널 생성 스킵)")
         return []
 
     return strategy.generate_signals(**kwargs)
 
 
-def run_once() -> str:
-    """전략 1회 실행. 로그 문자열 반환."""
+def run_once() -> dict:
+    """전략 1회 실행. 구조화된 결과 dict 반환."""
     load_env()
     from src.core.broker import KISBroker
     from src.core.data_manager import DataManager
@@ -104,6 +105,7 @@ def run_once() -> str:
 
     log_capture = io.StringIO()
     handler_id = logger.add(log_capture, format="{time:HH:mm:ss} | {level} | {message}")
+    strategy_results = []
     try:
         # 데이터 수집
         collector.collect_all()
@@ -111,7 +113,16 @@ def run_once() -> str:
         # 전략 신호 생성 (제네릭 패턴)
         all_signals = []
         for strategy in strategies:
-            all_signals.extend(_run_strategy(strategy, dm))
+            signals = _run_strategy(strategy, dm)
+            strategy_results.append({
+                "strategy": strategy.name,
+                "signal_count": len(signals),
+                "signals": [
+                    {"code": s.code, "signal": s.signal.value, "reason": s.reason}
+                    for s in signals
+                ],
+            })
+            all_signals.extend(signals)
 
         # 알림 + 실행
         if all_signals:
@@ -120,7 +131,12 @@ def run_once() -> str:
     finally:
         logger.remove(handler_id)
 
-    return log_capture.getvalue() or "전략 실행 완료 (신호 없음)"
+    return {
+        "log": log_capture.getvalue() or "전략 실행 완료",
+        "simulation_mode": simulation_mode,
+        "total_signals": len(all_signals),
+        "strategies": strategy_results,
+    }
 
 
 def get_kill_switch_status() -> bool:

@@ -105,6 +105,10 @@ class QuantFactorStrategy(BaseStrategy):
         filtered = {code: prices for code, prices in price_data.items()
                     if prices is not None and len(prices) >= self.min_data_days}
         if len(filtered) < 2:
+            logger.warning(
+                f"[{self.name}] 시그널 스킵: 유효 종목 {len(filtered)}개 "
+                f"(최소 2개 필요, min_data_days={self.min_data_days})"
+            )
             return {}
         return {"price_data": filtered}
 

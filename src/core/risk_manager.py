@@ -234,7 +234,16 @@ class RiskManager:
     def calculate_position_size(self, price: float, market: str = "KR") -> int:
         """적정 포지션 사이즈 계산 (동일 비중 기반)"""
         total = self.state.total_equity + self.state.cash
-        if total == 0 or price == 0:
+        if total == 0:
+            # fallback: settings의 initial_capital 사용
+            config = get_config()
+            sim_config = config.get("simulation", {})
+            total = float(sim_config.get(
+                "initial_capital",
+                config.get("backtest", {}).get("initial_capital", 10_000_000),
+            ))
+            logger.warning(f"equity=0, initial_capital fallback: {total:,.0f}")
+        if price == 0:
             return 0
 
         # 최대 비중의 80%로 보수적 사이징

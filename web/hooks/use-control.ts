@@ -59,10 +59,16 @@ export function useBotExecution() {
     setLastResult(null);
     try {
       const res = await runBot();
+      const d = res.data as Record<string, unknown> | null;
+      const totalSignals = (d?.total_signals as number) ?? 0;
+      const simMode = d?.simulation_mode ? "[시뮬레이션] " : "";
+      const summary = totalSignals > 0
+        ? `${simMode}전략 실행 완료 — 시그널 ${totalSignals}건`
+        : `${simMode}전략 실행 완료 — 시그널 없음`;
       setLastResult({
         type: "run",
         success: !res.error,
-        message: res.error ?? "전략 실행 완료",
+        message: res.error ?? summary,
         timestamp: new Date().toISOString(),
       });
     } catch (e) {

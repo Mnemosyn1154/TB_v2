@@ -23,6 +23,7 @@ from typing import Any
 from loguru import logger
 
 from src.core.broker import KISBroker
+from src.core.config import get_config
 from src.core.data_manager import DataManager
 from src.core.exchange import get_us_exchange
 from src.core.portfolio_tracker import PortfolioTracker
@@ -65,6 +66,21 @@ class OrderExecutor:
         mode_label = "시뮬레이션" if simulation_mode else "실거래"
         logger.info(f"OrderExecutor 초기화 완료 (모드: {mode_label})")
 
+    def _update_sim_prices(self) -> None:
+        """시뮬레이션 포지션의 현재가를 갱신합니다."""
+        if not (self.simulation_mode and self.portfolio_tracker):
+            return
+        positions = self.portfolio_tracker.get_all_positions()
+        if not positions:
+            return
+        for pos in positions:
+            try:
+                price = self.get_current_price(pos["code"], pos["market"])
+                if price > 0:
+                    self.portfolio_tracker.update_position_price(pos["code"], price)
+            except Exception as e:
+                logger.warning(f"시뮬레이션 가격 갱신 실패: {pos['code']} — {e}")
+
     def execute_signals(self, signals: list[TradeSignal]) -> None:
         """
         매매 신호 리스트를 순차적으로 실행합니다.
@@ -72,6 +88,9 @@ class OrderExecutor:
         Args:
             signals: Strategy에서 생성한 TradeSignal 리스트
         """
+        # 시뮬레이션 모드: 기존 포지션 현재가 갱신
+        self._update_sim_prices()
+
         if not signals:
             return
 
@@ -128,6 +147,14 @@ class OrderExecutor:
                 logger.warning(f"시뮬레이션 매수 실패 (현금 부족): {signal.code}")
                 return
         else:
+            # 안전장치: simulation.enabled=true인데 실주문 경로 진입 시 차단
+            config = get_config()
+            if config.get("simulation", {}).get("enabled", False):
+                logger.critical(
+                    f"실주문 차단: simulation.enabled=true인데 simulation_mode=False로 "
+                    f"OrderExecutor 생성됨. {signal.code} 매수 스킵"
+                )
+                return
             if signal.market == "KR":
                 self.broker.order_kr_buy(signal.code, quantity)
             else:
@@ -183,6 +210,14 @@ class OrderExecutor:
                 logger.warning(f"시뮬레이션 매도 실패 (포지션 없음): {signal.code}")
                 return
         else:
+            # 안전장치: simulation.enabled=true인데 실주문 경로 진입 시 차단
+            config = get_config()
+            if config.get("simulation", {}).get("enabled", False):
+                logger.critical(
+                    f"실주문 차단: simulation.enabled=true인데 simulation_mode=False로 "
+                    f"OrderExecutor 생성됨. {signal.code} 매도 스킵"
+                )
+                return
             if signal.market == "KR":
                 self.broker.order_kr_sell(signal.code, quantity)
             else:

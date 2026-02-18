@@ -86,9 +86,17 @@ export function SignalPreview({ onExecute, executing }: SignalPreviewProps) {
                   </span>
                 </div>
                 <div className="text-right text-sm">
-                  <div className="font-mono">{formatNumber(s.quantity)}주</div>
+                  <div className="font-mono">
+                    {s.quantity > 0
+                      ? `~${formatNumber(s.quantity)}주`
+                      : "—"}
+                  </div>
                   <div className="text-xs text-muted-foreground">
-                    {s.market === "KR" ? formatKRW(s.price) : `$${s.price}`}
+                    {s.price > 0
+                      ? s.market === "KR"
+                        ? `~${formatKRW(s.price)}`
+                        : `~$${s.price.toFixed(2)}`
+                      : "가격 미정"}
                   </div>
                 </div>
               </div>

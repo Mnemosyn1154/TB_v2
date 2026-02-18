@@ -146,6 +146,7 @@ def stop_session(session_id: str) -> None:
 def generate_signals_dry_run() -> list[dict]:
     """
     현재 DB 데이터로 전략 시그널만 생성 (주문 안 함).
+    quantity=0 / price=0인 시그널에 예상 수량/가격을 보충합니다.
 
     Returns:
         시그널 dict 리스트: strategy, code, market, signal, price, reason, _raw
@@ -175,13 +176,25 @@ def generate_signals_dry_run() -> list[dict]:
             for sig in signals:
                 if sig.signal == Signal.HOLD:
                     continue
+
+                # 예상 수량/가격 보충 (프리뷰용)
+                est_price = sig.price
+                est_quantity = sig.quantity
+                if est_price <= 0:
+                    prices = price_data.get(sig.code)
+                    est_price = float(prices.iloc[-1]) if prices is not None and len(prices) > 0 else 0.0
+                if est_quantity <= 0 and est_price > 0 and sig.signal == Signal.BUY:
+                    from src.core.risk_manager import RiskManager
+                    rm = RiskManager()
+                    est_quantity = rm.calculate_position_size(est_price, sig.market)
+
                 all_signals.append({
                     "strategy": sig.strategy,
                     "code": sig.code,
                     "market": sig.market,
                     "signal": sig.signal.value,
-                    "quantity": sig.quantity,
-                    "price": sig.price,
+                    "quantity": est_quantity,
+                    "price": est_price,
                     "reason": sig.reason,
                     "_raw": sig,
                 })
@@ -218,6 +231,7 @@ def execute_signal(session_id: str, signal_dict: dict) -> dict:
         from src.core.broker import KISBroker
         from src.core.data_manager import DataManager
         from src.core.risk_manager import RiskManager
+        from src.core.portfolio_tracker import PortfolioTracker, sync_risk_manager
         from src.execution.executor import OrderExecutor
         from src.utils.notifier import TelegramNotifier
 
@@ -225,7 +239,19 @@ def execute_signal(session_id: str, signal_dict: dict) -> dict:
         rm = RiskManager()
         dm = DataManager(broker)
         notifier = TelegramNotifier()
-        executor = OrderExecutor(broker, rm, dm, notifier)
+
+        # 시뮬레이션 모드: PortfolioTracker 연동 + RiskManager 동기화
+        config = get_config()
+        sim_enabled = config.get("simulation", {}).get("enabled", False)
+        tracker = PortfolioTracker(dm.engine) if sim_enabled else None
+        if tracker:
+            sync_risk_manager(rm, tracker)
+
+        executor = OrderExecutor(
+            broker, rm, dm, notifier,
+            portfolio_tracker=tracker,
+            simulation_mode=sim_enabled,
+        )
 
         # 단일 시그널 실행 (OrderExecutor가 리스크 검증 + 주문 + 기록 처리)
         executor.execute_signals([signal])
