@@ -8,8 +8,26 @@ from pyapi.schemas import BacktestRequest
 router = APIRouter(prefix="/py/backtest", tags=["backtest"])
 
 
+def _to_native(obj):
+    """numpy/pandas 타입 → Python 네이티브 타입으로 재귀 변환"""
+    import numpy as np
+
+    if isinstance(obj, dict):
+        return {k: _to_native(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_to_native(v) for v in obj]
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    if isinstance(obj, (np.floating,)):
+        return float(obj)
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return obj
+
+
 def _serialize_result(result, metrics: dict) -> dict:
     """BacktestResult + metrics dict → JSON-safe dict"""
+    metrics = _to_native(metrics)
     # equity_curve: pd.Series → {dates, values}
     equity = {}
     if result.equity_curve is not None and not result.equity_curve.empty:
@@ -47,13 +65,13 @@ def _serialize_result(result, metrics: dict) -> dict:
 
     pnl_values = [t.pnl for t in result.trades if t.pnl is not None and t.pnl != 0]
 
-    return {
+    return _to_native({
         "metrics": metrics,
         "equity_curve": equity,
         "monthly_returns": monthly,
         "trades": trades,
         "pnl_values": pnl_values,
-    }
+    })
 
 
 @router.post("/run")
