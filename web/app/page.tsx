@@ -5,6 +5,7 @@ import { DashboardHeader } from "@/components/layout/dashboard-header";
 import { PortfolioTab } from "@/components/portfolio/portfolio-tab";
 import { BenchmarkTab } from "@/components/benchmark/benchmark-tab";
 import { StrategyTab } from "@/components/strategy/strategy-tab";
+import { BacktestTab } from "@/components/backtest/backtest-tab";
 import type { TabKey } from "@/lib/constants";
 
 export default function Home() {
@@ -18,7 +19,7 @@ export default function Home() {
         {activeTab === "portfolio" && <PortfolioTab />}
         {activeTab === "benchmark" && <BenchmarkTab />}
         {activeTab === "strategy" && <StrategyTab />}
-        {activeTab === "backtest" && <PlaceholderTab name="백테스트" />}
+        {activeTab === "backtest" && <BacktestTab />}
         {activeTab === "paper" && <PlaceholderTab name="모의거래" />}
         {activeTab === "control" && <PlaceholderTab name="실행 & 제어" />}
       </main>
