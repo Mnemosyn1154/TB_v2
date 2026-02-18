@@ -123,7 +123,7 @@ class KISBroker:
             with open(cache_path, "r") as f:
                 data = json.load(f)
             # 앱키가 동일한 경우에만 캐시 사용
-            if data.get("app_key_hash") == hashlib.md5(self.app_key.encode()).hexdigest():
+            if data.get("app_key_hash") == hashlib.sha256(self.app_key.encode()).hexdigest():
                 return data
         except (FileNotFoundError, json.JSONDecodeError, KeyError):
             pass
@@ -137,7 +137,7 @@ class KISBroker:
         data = {
             "access_token": token,
             "expires_at": expires.isoformat(),
-            "app_key_hash": hashlib.md5(self.app_key.encode()).hexdigest(),
+            "app_key_hash": hashlib.sha256(self.app_key.encode()).hexdigest(),
         }
         try:
             with open(cache_path, "w") as f:

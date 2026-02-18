@@ -46,11 +46,20 @@ def load_config(config_path: str | None = None) -> dict[str, Any]:
     return config
 
 
+_env_loaded = False
+
+
 def load_env() -> None:
     """환경 변수 로드 (.env)
 
     워크트리에서 실행 시 메인 레포의 .env도 탐색합니다.
+    최초 1회만 실행되며, 이후 호출은 무시됩니다.
     """
+    global _env_loaded
+    if _env_loaded:
+        return
+    _env_loaded = True
+
     env_path = ROOT_DIR / ".env"
     if env_path.exists():
         load_dotenv(env_path)

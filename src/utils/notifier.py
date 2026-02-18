@@ -70,12 +70,11 @@ class TelegramNotifier:
             return
 
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.ensure_future(self._send_async(message))
-            else:
-                loop.run_until_complete(self._send_async(message))
+            # 이미 실행 중인 이벤트 루프가 있는 경우 (예: FastAPI 내부)
+            loop = asyncio.get_running_loop()
+            loop.create_task(self._send_async(message))
         except RuntimeError:
+            # 이벤트 루프가 없는 경우 (일반 스크립트 실행)
             asyncio.run(self._send_async(message))
 
     # ──────────────────────────────────────────────

@@ -212,13 +212,29 @@ class DualMomentumStrategy(BaseStrategy):
                 "kr_return": self.kr_return,
                 "us_return": self.us_return,
                 "allocation": new_allocation,
+                "target_allocation": new_allocation,
             },
         ))
 
-        self.current_allocation = new_allocation
-        logger.info(f"🔄 듀얼 모멘텀 리밸런싱: → {new_allocation}")
+        # 주의: current_allocation은 on_trade_executed()에서 체결 성공 시 업데이트
+        logger.info(f"🔄 듀얼 모멘텀 리밸런싱 신호: {self.current_allocation} → {new_allocation}")
 
         return signals
+
+    def on_trade_executed(self, signal: TradeSignal, success: bool) -> None:
+        """체결 콜백 — 실제 체결 성공 시에만 배분 상태 업데이트"""
+        if not success:
+            return
+
+        target = signal.metadata.get("target_allocation") if signal.metadata else None
+
+        if signal.signal == Signal.BUY and target:
+            self.current_allocation = target
+            logger.info(f"[DualMomentum] 배분 확정: {target}")
+        elif signal.signal == Signal.CLOSE:
+            # 청산 후 BUY가 이어지므로, 청산 단독 시에만 NONE으로
+            # (BUY 신호의 target_allocation이 최종 상태를 결정)
+            pass
 
     def _determine_allocation(self) -> str:
         """듀얼 모멘텀 판단 로직"""
