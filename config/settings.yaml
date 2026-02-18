@@ -10,6 +10,34 @@ strategies:
   stat_arb:
     enabled: true
     pairs:
+      # 1순위: KO/PEP — 가장 클래식한 pairs trade (Consumer Staples)
+      - name: KO_PEP
+        market: US
+        stock_a: KO
+        stock_b: PEP
+        hedge_etf: SH
+        exchange_a: NYS
+        exchange_b: NAS
+        exchange_hedge: NYS
+      # 2순위: XOM/CVX — 석유 메이저 (동일 유가 노출)
+      - name: XOM_CVX
+        market: US
+        stock_a: XOM
+        stock_b: CVX
+        hedge_etf: SH
+        exchange_a: NYS
+        exchange_b: NYS
+        exchange_hedge: NYS
+      # 3순위: V/MA — 결제 네트워크 듀오폴리
+      - name: V_MA
+        market: US
+        stock_a: V
+        stock_b: MA
+        hedge_etf: SH
+        exchange_a: NYS
+        exchange_b: NYS
+        exchange_hedge: NYS
+      # 비교용: 기존 MSFT/GOOGL (공적분 안 나올 가능성 높음)
       - name: MSFT_GOOGL
         market: US
         stock_a: MSFT
@@ -18,12 +46,12 @@ strategies:
         exchange_a: NAS
         exchange_b: NAS
         exchange_hedge: NAS
-    lookback_window: 60
-    entry_z_score: 2
+    lookback_window: 90
+    entry_z_score: 1.5
     exit_z_score: 0.5
-    stop_loss_z_score: 3.5
-    recalc_beta_days: 30
-    coint_pvalue: 0.05
+    stop_loss_z_score: 3.0
+    recalc_beta_days: 20
+    coint_pvalue: 0.10
   dual_momentum:
     enabled: true
     lookback_months: 12
@@ -184,19 +212,19 @@ strategies:
         name: Mastercard
         exchange: NYS
   sam_hynix:
-    enabled: true
+    enabled: false
     pairs:
       - name: Samsung_Hynix
         market: KR
         stock_a: '005930'
         stock_b: '000660'
         hedge_etf: '114800'
-    lookback_window: 60
-    entry_z_score: 2
+    lookback_window: 90
+    entry_z_score: 1.5
     exit_z_score: 0.5
-    stop_loss_z_score: 3.5
-    recalc_beta_days: 30
-    coint_pvalue: 0.05
+    stop_loss_z_score: 3.0
+    recalc_beta_days: 20
+    coint_pvalue: 0.10
     type: stat_arb
 risk:
   max_position_pct: 10
@@ -234,5 +262,5 @@ backtest:
   commission_rate_us: 0
   tax_rate_kr: 0.0018
   slippage_rate: 0.001
-  start_date: '2024-01-01'
+  start_date: '2022-01-01'
   end_date: '2025-12-31'
