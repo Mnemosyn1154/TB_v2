@@ -100,6 +100,7 @@ def _serialize_result(result, metrics: dict) -> dict:
             "side": t.side,
             "quantity": t.quantity,
             "price": t.price,
+            "amount": t.quantity * t.price,
             "commission": t.commission,
             "pnl": t.pnl,
             "pnl_pct": t.pnl_pct,
@@ -119,22 +120,130 @@ def _serialize_result(result, metrics: dict) -> dict:
     })
 
 
+def _build_summary_logs(req: "BacktestRequest", result, metrics: dict, strategy) -> list[str]:
+    """백테스트 결과를 사람이 읽기 쉬운 요약 메시지로 변환"""
+    logs: list[str] = []
+    data_source = metrics.get("data_source", "")
+    strategy_type = getattr(strategy, "name", req.strategy)
+
+    # 1. 데이터 수집
+    codes = strategy.required_codes()
+    logs.append(f"📂 데이터 수집 완료 — {len(codes)}개 종목, 소스: {data_source}")
+
+    # 2. 전략별 상세 로그
+    if strategy_type == "StatArb":
+        _logs_stat_arb(logs, strategy)
+    elif strategy_type == "DualMomentum":
+        _logs_dual_momentum(logs, strategy)
+    elif strategy_type == "QuantFactor":
+        _logs_quant_factor(logs, strategy)
+
+    # 3. 거래 결과 요약
+    total = metrics.get("total_trades", 0)
+    if total > 0:
+        win_rate = metrics.get("win_rate", 0) or 0
+        logs.append(f"📈 총 {total}건 거래 발생 (승률 {win_rate * 100:.1f}%)")
+    else:
+        logs.append("⚠️ 거래가 발생하지 않았습니다")
+        # 거래 0건 원인 힌트
+        if strategy_type == "StatArb":
+            logs.append("   → 공적분 관계가 성립하지 않거나 Z-Score가 진입 조건에 도달하지 못했을 수 있습니다")
+        elif strategy_type == "DualMomentum":
+            logs.append("   → 리밸런싱 조건이 충족되지 않았을 수 있습니다")
+        elif strategy_type == "QuantFactor":
+            logs.append("   → 팩터 스코어 계산에 필요한 데이터가 부족할 수 있습니다")
+
+    total_return = metrics.get("total_return", 0) or 0
+    logs.append(f"💰 최종 수익률: {total_return * 100:+.2f}%")
+
+    return logs
+
+
+def _logs_stat_arb(logs: list[str], strategy) -> None:
+    """StatArb 전략 요약 로그"""
+    for pair in strategy.pairs:
+        state = strategy.pair_states.get(pair.name)
+        if not state:
+            continue
+        if state.is_cointegrated:
+            logs.append(
+                f"✅ {pair.name} ({pair.stock_a}/{pair.stock_b}): "
+                f"공적분 발견 (p={state.p_value:.4f}), "
+                f"헤지비율 β={state.beta:.4f}, Z-Score={state.current_z:.2f}"
+            )
+        else:
+            logs.append(
+                f"❌ {pair.name} ({pair.stock_a}/{pair.stock_b}): "
+                f"공적분 미발견 (p={state.p_value:.4f}) — 이 페어는 거래 불가"
+            )
+
+
+def _logs_dual_momentum(logs: list[str], strategy) -> None:
+    """DualMomentum 전략 요약 로그"""
+    logs.append(
+        f"📊 모멘텀 비교: KR {strategy.kr_return * 100:+.1f}% vs US {strategy.us_return * 100:+.1f}% "
+        f"(무위험수익률 {strategy.risk_free_rate * 100:.1f}%)"
+    )
+    alloc = strategy.current_allocation
+    alloc_label = {"KR": "한국 ETF", "US": "미국 ETF", "SAFE": "안전자산 (채권)", "NONE": "미배분"}
+    logs.append(f"🎯 최종 배분: {alloc_label.get(alloc, alloc)}")
+
+
+def _logs_quant_factor(logs: list[str], strategy) -> None:
+    """QuantFactor 전략 요약 로그"""
+    scored = len(strategy.last_scores)
+    total = len(strategy.universe_codes)
+    logs.append(f"📊 {total}개 유니버스 중 {scored}개 종목 스코어링 완료")
+    if scored > 0:
+        ranked = sorted(strategy.last_scores.items(), key=lambda x: x[1]["composite"], reverse=True)
+        top = ranked[:min(5, len(ranked))]
+        names = [code for code, _ in top]
+        logs.append(f"🏆 상위 종목: {', '.join(names)}")
+    holdings = len(strategy.current_holdings)
+    logs.append(f"📦 현재 보유: {holdings}종목")
+
+
 @router.post("/run")
 def run_backtest(req: BacktestRequest, secret: None = Depends(verify_secret)):
     """백테스트 실행"""
-    from dashboard.services.backtest_service import run_backtest
+    from src.backtest.runner import BacktestRunner
 
     try:
-        result, metrics = run_backtest(
-            strategy_name=req.strategy,
-            initial_capital=req.initial_capital,
-            start_date=req.start_date or None,
-            end_date=req.end_date or None,
-            commission_rate=req.commission_rate,
-            slippage_rate=req.slippage_rate,
-            pair_name=req.pair_name,
+        runner = BacktestRunner()
+        bt_config = runner.config.get("backtest", {})
+        commission = req.commission_rate or bt_config.get("commission_rate", 0.00015)
+        slippage = req.slippage_rate or bt_config.get("slippage_rate", 0.001)
+
+        # 전략 인스턴스 직접 생성 (로그용 상태 접근)
+        strategy = runner._create_strategy(req.strategy)
+        if req.pair_name:
+            available = strategy.get_pair_names()
+            if available and req.pair_name in available:
+                strategy.filter_pairs([req.pair_name])
+
+        from src.backtest.engine import BacktestEngine
+        from src.backtest.analyzer import PerformanceAnalyzer
+
+        price_data, data_source = runner._load_data(
+            strategy, req.start_date or "", req.end_date or ""
         )
-        return _json_response({"data": _serialize_result(result, metrics), "error": None})
+        if not price_data:
+            return _json_response({"data": None, "error": "데이터가 없습니다. 데이터 수집을 먼저 실행하세요."})
+
+        engine = BacktestEngine(
+            strategy=strategy,
+            initial_capital=req.initial_capital,
+            commission_rate=commission,
+            slippage_rate=slippage,
+        )
+        result = engine.run(price_data, req.start_date or "", req.end_date or "")
+        analyzer = PerformanceAnalyzer(result)
+        metrics = analyzer.summary()
+        metrics["data_source"] = data_source
+
+        data = _serialize_result(result, metrics)
+        data["logs"] = _build_summary_logs(req, result, metrics, strategy)
+        return _json_response({"data": data, "error": None})
     except Exception as e:
         return _json_response({"data": None, "error": str(e)})
 

@@ -30,6 +30,7 @@ export interface Trade {
   side: TradeSide;
   quantity: number;
   price: number;
+  amount: number;
   commission: number;
   pnl: number | null;
   pnl_pct: number | null;
@@ -42,4 +43,5 @@ export interface BacktestResult {
   monthly_returns: { index: number[]; columns: string[]; data: number[][] };
   trades: Trade[];
   pnl_values: number[];
+  logs?: string[];
 }

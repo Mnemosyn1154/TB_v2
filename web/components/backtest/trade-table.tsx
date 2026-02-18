@@ -82,6 +82,7 @@ export function TradeTable({ trades }: TradeTableProps) {
                   <TableHead>종목</TableHead>
                   <TableHead>방향</TableHead>
                   <TableHead className="text-right">가격</TableHead>
+                  <TableHead className="text-right">금액</TableHead>
                   <TableHead
                     className="cursor-pointer select-none text-right"
                     onClick={() => handleSort("pnl")}
@@ -128,6 +129,9 @@ export function TradeTable({ trades }: TradeTableProps) {
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs">
                       {formatKRW(t.price)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs">
+                      {formatKRW(t.amount)}
                     </TableCell>
                     <TableCell
                       className={cn(

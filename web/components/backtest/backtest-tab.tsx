@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useBacktest } from "@/hooks/use-backtest";
 import { useApi } from "@/hooks/use-api";
 import { getSettings } from "@/lib/api-client";
@@ -11,6 +11,7 @@ import { DrawdownChart } from "./drawdown-chart";
 import { MonthlyHeatmap } from "./monthly-heatmap";
 import { PnlDistribution } from "./pnl-distribution";
 import { TradeTable } from "./trade-table";
+import { BacktestLogs } from "./backtest-logs";
 import type { ApiResponse } from "@/types/common";
 
 interface SettingsData {
@@ -68,6 +69,10 @@ export function BacktestTab() {
           </div>
 
           <TradeTable trades={result.trades} />
+
+          {result.logs && result.logs.length > 0 && (
+            <BacktestLogs logs={result.logs} />
+          )}
         </>
       )}
 
