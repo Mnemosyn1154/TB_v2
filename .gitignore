@@ -1,0 +1,26 @@
+# env
+.env
+.env.*
+!.env.example
+
+# Node
+web/node_modules/
+web/.next/
+web/.vercel
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Data
+data/
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
