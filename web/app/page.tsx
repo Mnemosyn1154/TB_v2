@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { DashboardHeader } from "@/components/layout/dashboard-header";
 import { PortfolioTab } from "@/components/portfolio/portfolio-tab";
+import { BenchmarkTab } from "@/components/benchmark/benchmark-tab";
 import type { TabKey } from "@/lib/constants";
 
 export default function Home() {
@@ -14,7 +15,7 @@ export default function Home() {
 
       <main className="mx-auto max-w-7xl px-4 py-6">
         {activeTab === "portfolio" && <PortfolioTab />}
-        {activeTab === "benchmark" && <PlaceholderTab name="벤치마크 비교" />}
+        {activeTab === "benchmark" && <BenchmarkTab />}
         {activeTab === "strategy" && <PlaceholderTab name="전략 설정" />}
         {activeTab === "backtest" && <PlaceholderTab name="백테스트" />}
         {activeTab === "paper" && <PlaceholderTab name="모의거래" />}
