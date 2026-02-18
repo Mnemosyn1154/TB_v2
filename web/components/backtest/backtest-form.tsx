@@ -15,26 +15,29 @@ import {
 } from "@/components/ui/select";
 import { getBacktestPairs } from "@/lib/api-client";
 import { formatNumber } from "@/lib/formatters";
+import { snakeToTitle } from "@/lib/strategy-utils";
 import type { BacktestRequest } from "@/types/backtest";
 
-const STRATEGIES = [
-  { key: "stat_arb", label: "StatArb (페어 트레이딩)" },
-  { key: "dual_momentum", label: "Dual Momentum" },
-  { key: "quant_factor", label: "Quant Factor" },
-];
-
 interface BacktestFormProps {
+  strategies: string[];
   onRun: (params: BacktestRequest) => void;
   loading: boolean;
 }
 
-export function BacktestForm({ onRun, loading }: BacktestFormProps) {
-  const [strategy, setStrategy] = useState("stat_arb");
+export function BacktestForm({ strategies, onRun, loading }: BacktestFormProps) {
+  const [strategy, setStrategy] = useState("");
   const [startDate, setStartDate] = useState("2024-01-01");
   const [endDate, setEndDate] = useState("2025-12-31");
   const [initialCapital, setInitialCapital] = useState(50_000_000);
   const [pairName, setPairName] = useState<string | null>(null);
   const [pairs, setPairs] = useState<string[]>([]);
+
+  // Select first strategy when list loads
+  useEffect(() => {
+    if (strategies.length > 0 && !strategies.includes(strategy)) {
+      setStrategy(strategies[0]);
+    }
+  }, [strategies, strategy]);
 
   const fetchPairs = useCallback(async (strat: string) => {
     try {
@@ -48,7 +51,7 @@ export function BacktestForm({ onRun, loading }: BacktestFormProps) {
   }, []);
 
   useEffect(() => {
-    fetchPairs(strategy);
+    if (strategy) fetchPairs(strategy);
   }, [strategy, fetchPairs]);
 
   const handleSubmit = () => {
@@ -73,9 +76,9 @@ export function BacktestForm({ onRun, loading }: BacktestFormProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {STRATEGIES.map((s) => (
-                  <SelectItem key={s.key} value={s.key}>
-                    {s.label}
+                {strategies.map((key) => (
+                  <SelectItem key={key} value={key}>
+                    {snakeToTitle(key)}
                   </SelectItem>
                 ))}
               </SelectContent>

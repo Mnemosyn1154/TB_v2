@@ -1,6 +1,9 @@
 "use client";
 
+import { useCallback } from "react";
 import { useBacktest } from "@/hooks/use-backtest";
+import { useApi } from "@/hooks/use-api";
+import { getSettings } from "@/lib/api-client";
 import { BacktestForm } from "./backtest-form";
 import { BacktestKPIs } from "./backtest-kpis";
 import { EquityCurve } from "./equity-curve";
@@ -8,15 +11,28 @@ import { DrawdownChart } from "./drawdown-chart";
 import { MonthlyHeatmap } from "./monthly-heatmap";
 import { PnlDistribution } from "./pnl-distribution";
 import { TradeTable } from "./trade-table";
+import type { ApiResponse } from "@/types/common";
+
+interface SettingsData {
+  strategies: Record<string, Record<string, unknown>>;
+  [key: string]: unknown;
+}
 
 export function BacktestTab() {
   const { result, error, loading, run } = useBacktest();
+  const settingsFetcher = useCallback(
+    () => getSettings() as Promise<ApiResponse<SettingsData>>,
+    []
+  );
+  const { data: settings } = useApi<SettingsData>(settingsFetcher);
+
+  const strategyKeys = settings ? Object.keys(settings.strategies) : [];
 
   return (
     <div className="flex flex-col gap-6">
       <h2 className="text-lg font-semibold">백테스트</h2>
 
-      <BacktestForm onRun={run} loading={loading} />
+      <BacktestForm strategies={strategyKeys} onRun={run} loading={loading} />
 
       {error && (
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
