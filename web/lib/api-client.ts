@@ -41,10 +41,12 @@ export const runBot = () => fetchApi("/bot/run", { method: "POST" });
 export const collectData = () =>
   fetchApi("/bot/collect", { method: "POST" });
 export const getKillSwitch = () => fetchApi("/bot/kill-switch");
-export const activateKillSwitch = () =>
-  fetchApi("/bot/kill-switch/activate", { method: "POST" });
-export const deactivateKillSwitch = () =>
-  fetchApi("/bot/kill-switch/deactivate", { method: "POST" });
+export const toggleKillSwitch = (action: "activate" | "deactivate") =>
+  fetchApi("/bot/kill-switch", {
+    method: "POST",
+    body: JSON.stringify({ action }),
+  });
+export const getBotStatus = () => fetchApi("/bot/status");
 
 // Signals
 export const getSignals = () => fetchApi("/signals");
