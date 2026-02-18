@@ -223,7 +223,7 @@ class PortfolioTracker:
     def execute_buy(self, code: str, market: str, quantity: int,
                     price: float, strategy: str = "") -> bool:
         """
-        매수 실행: 현금 차감 + 포지션 추가.
+        매수 실행: 현금 차감 + 포지션 추가 (단일 트랜잭션).
         현금 부족이면 False.
         """
         cost = price * quantity
@@ -233,15 +233,35 @@ class PortfolioTracker:
                            f"필요 {cost:,.0f}, 보유 {cash:,.0f}")
             return False
 
-        self.set_cash(cash - cost)
-        self.add_position(code, market, "LONG", quantity, price, strategy)
+        now = datetime.now().isoformat()
+        new_cash = cash - cost
+        with self.engine.begin() as conn:
+            # 현금 차감
+            conn.execute(text("""
+                INSERT INTO sim_portfolio (key, value, updated_at)
+                VALUES ('cash', :val, :now)
+                ON CONFLICT(key) DO UPDATE SET value = :val, updated_at = :now
+            """), {"val": str(new_cash), "now": now})
+            # 포지션 추가
+            conn.execute(text("""
+                INSERT INTO sim_positions
+                    (code, market, side, quantity, entry_price, current_price, strategy, entry_time, updated_at)
+                VALUES (:code, :market, 'LONG', :qty, :ep, :ep, :strat, :et, :now)
+                ON CONFLICT(code) DO UPDATE SET
+                    market = :market, side = 'LONG', quantity = :qty,
+                    entry_price = :ep, current_price = :ep,
+                    strategy = :strat, entry_time = :et, updated_at = :now
+            """), {
+                "code": code, "market": market, "qty": quantity,
+                "ep": price, "strat": strategy, "et": now, "now": now,
+            })
         logger.info(f"시뮬레이션 매수: {code} x{quantity} @ {price:,.2f} "
-                    f"(비용 {cost:,.0f}, 잔여 현금 {cash - cost:,.0f})")
+                    f"(비용 {cost:,.0f}, 잔여 현금 {new_cash:,.0f})")
         return True
 
     def execute_sell(self, code: str, price: float) -> float:
         """
-        매도 실행: 포지션 제거 + 현금 가산.
+        매도 실행: 포지션 제거 + 현금 가산 (단일 트랜잭션).
         반환: 매도 수입 금액. 포지션 미보유 시 0.0.
         """
         pos = self.get_position(code)
@@ -251,10 +271,22 @@ class PortfolioTracker:
 
         proceeds = price * pos["quantity"]
         cash = self.get_cash()
-        self.set_cash(cash + proceeds)
-        self.remove_position(code)
+        new_cash = cash + proceeds
+        now = datetime.now().isoformat()
+        with self.engine.begin() as conn:
+            # 현금 가산
+            conn.execute(text("""
+                INSERT INTO sim_portfolio (key, value, updated_at)
+                VALUES ('cash', :val, :now)
+                ON CONFLICT(key) DO UPDATE SET value = :val, updated_at = :now
+            """), {"val": str(new_cash), "now": now})
+            # 포지션 제거
+            conn.execute(
+                text("DELETE FROM sim_positions WHERE code = :code"),
+                {"code": code},
+            )
         logger.info(f"시뮬레이션 매도: {code} x{pos['quantity']} @ {price:,.2f} "
-                    f"(수입 {proceeds:,.0f}, 잔여 현금 {cash + proceeds:,.0f})")
+                    f"(수입 {proceeds:,.0f}, 잔여 현금 {new_cash:,.0f})")
         return proceeds
 
     # ──────────────────────────────────────────────
