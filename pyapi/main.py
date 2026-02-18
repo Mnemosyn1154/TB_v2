@@ -12,6 +12,8 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from pyapi.routers import portfolio, backtest, bot, signals, paper
+
 app = FastAPI(title="D2trader Python API", version="0.1.0")
 
 # CORS — 개발 시 Next.js에서의 직접 호출 허용
@@ -21,6 +23,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 라우터 등록
+app.include_router(portfolio.router)
+app.include_router(backtest.router)
+app.include_router(bot.router)
+app.include_router(signals.router)
+app.include_router(paper.router)
 
 
 @app.get("/py/health")

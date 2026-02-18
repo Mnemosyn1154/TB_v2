@@ -1,0 +1,209 @@
+"""
+AlgoTrader KR — 주문 실행 엔진
+
+전략에서 생성된 TradeSignal을 리스크 검증 후 실제 주문으로 실행합니다.
+
+Depends on:
+    - src.core.broker (주문 실행)
+    - src.core.risk_manager (위험 검증 + 포지션 관리)
+    - src.core.data_manager (거래 기록 저장)
+    - src.utils.notifier (매매 알림)
+
+Used by:
+    - main.py (AlgoTrader.run_once)
+
+Modification Guide:
+    - 주문 실행 로직을 변경하려면 _execute_buy()/_execute_sell()을 수정하세요.
+    - 새로운 Signal 타입을 처리하려면 execute_signals()의 분기를 추가하세요.
+    - 현재가 조회의 거래소 매핑은 src.core.exchange 유틸리티를 참조하세요.
+"""
+from datetime import datetime
+from typing import Any
+
+from loguru import logger
+
+from src.core.broker import KISBroker
+from src.core.data_manager import DataManager
+from src.core.exchange import get_us_exchange
+from src.core.risk_manager import RiskManager, Position
+from src.strategies.base import BaseStrategy, TradeSignal, Signal
+from src.utils.notifier import TelegramNotifier
+
+
+class OrderExecutor:
+    """
+    매매 신호를 실제 주문으로 변환하는 실행 엔진.
+
+    실행 흐름:
+        1. TradeSignal 수신
+        2. 현재가 조회 (price == 0인 경우)
+        3. RiskManager로 포지션 오픈 가능 여부 검증
+        4. KISBroker로 주문 전송
+        5. 포지션/거래 기록 업데이트
+        6. 텔레그램 알림 전송
+    """
+
+    def __init__(self, broker: KISBroker, risk_manager: RiskManager,
+                 data_manager: DataManager, notifier: TelegramNotifier,
+                 strategies: list[BaseStrategy] | None = None):
+        self.broker = broker
+        self.risk_manager = risk_manager
+        self.data_manager = data_manager
+        self.notifier = notifier
+
+        # 전략 이름 → 인스턴스 매핑 (체결 콜백용)
+        self._strategies_by_name: dict[str, BaseStrategy] = {}
+        if strategies:
+            for s in strategies:
+                self._strategies_by_name[s.name] = s
+
+        logger.info("OrderExecutor 초기화 완료")
+
+    def execute_signals(self, signals: list[TradeSignal]) -> None:
+        """
+        매매 신호 리스트를 순차적으로 실행합니다.
+
+        Args:
+            signals: Strategy에서 생성한 TradeSignal 리스트
+        """
+        if not signals:
+            return
+
+        for signal in signals:
+            logger.info(f"신호 처리: {signal}")
+
+            try:
+                if signal.signal == Signal.BUY:
+                    self._execute_buy(signal)
+                elif signal.signal in (Signal.CLOSE, Signal.SELL):
+                    self._execute_sell(signal)
+                elif signal.signal == Signal.HOLD:
+                    pass  # 명시적 무시
+            except Exception as e:
+                logger.error(f"신호 실행 실패: {signal.code} — {e}")
+                self.notifier.notify_error(f"주문 실패: {signal.code} — {e}")
+                strategy = self._strategies_by_name.get(signal.strategy)
+                if strategy:
+                    strategy.on_trade_executed(signal, success=False)
+
+    def _execute_buy(self, signal: TradeSignal) -> None:
+        """매수 신호 실행"""
+        # 1. 가격 결정
+        price = signal.price or self.get_current_price(signal.code, signal.market)
+        if price <= 0:
+            logger.warning(f"가격 조회 실패, 매수 스킵: {signal.code}")
+            return
+
+        # 2. 수량 결정
+        quantity = signal.quantity or self.risk_manager.calculate_position_size(
+            price, signal.market
+        )
+        if quantity <= 0:
+            logger.warning(f"포지션 사이즈 0, 매수 스킵: {signal.code}")
+            return
+
+        market_value = price * quantity
+
+        # 3. 리스크 검증
+        can_trade, reason = self.risk_manager.can_open_position(
+            signal.code, market_value
+        )
+        if not can_trade:
+            logger.warning(f"리스크 거부: {reason}")
+            self.notifier.notify_risk(f"{signal.code}: {reason}")
+            return
+
+        # 4. 주문 실행
+        if signal.market == "KR":
+            self.broker.order_kr_buy(signal.code, quantity)
+        else:
+            exchange = get_us_exchange(signal.code, purpose="order")
+            self.broker.order_us_buy(signal.code, quantity, exchange=exchange)
+
+        # 5. 포지션 등록
+        self.risk_manager.add_position(Position(
+            code=signal.code,
+            market=signal.market,
+            side="LONG",
+            quantity=quantity,
+            entry_price=price,
+            current_price=price,
+            strategy=signal.strategy,
+            entry_time=datetime.now().isoformat(),
+        ))
+
+        # 6. 거래 기록 + 알림
+        self.data_manager.save_trade(
+            signal.strategy, signal.code, signal.market,
+            "BUY", quantity, price, signal.reason,
+        )
+        self.notifier.notify_trade(
+            signal.strategy, signal.code, "BUY",
+            quantity, price, signal.reason,
+        )
+
+        # 7. 전략 체결 콜백
+        strategy = self._strategies_by_name.get(signal.strategy)
+        if strategy:
+            strategy.on_trade_executed(signal, success=True)
+
+    def _execute_sell(self, signal: TradeSignal) -> None:
+        """매도/청산 신호 실행"""
+        price = self.get_current_price(signal.code, signal.market)
+
+        # 보유 포지션 조회
+        pos = next(
+            (p for p in self.risk_manager.state.positions if p.code == signal.code),
+            None,
+        )
+        quantity = pos.quantity if pos else 0
+
+        if quantity <= 0:
+            logger.warning(f"보유 수량 없음, 매도 스킵: {signal.code}")
+            return
+
+        # 주문 실행
+        if signal.market == "KR":
+            self.broker.order_kr_sell(signal.code, quantity)
+        else:
+            exchange = get_us_exchange(signal.code, purpose="order")
+            self.broker.order_us_sell(signal.code, quantity, exchange=exchange)
+
+        # 포지션 제거 + 기록 + 알림
+        self.risk_manager.remove_position(signal.code)
+        self.data_manager.save_trade(
+            signal.strategy, signal.code, signal.market,
+            "SELL", quantity, price, signal.reason,
+        )
+        self.notifier.notify_trade(
+            signal.strategy, signal.code, "SELL",
+            quantity, price, signal.reason,
+        )
+
+        # 전략 체결 콜백
+        strategy = self._strategies_by_name.get(signal.strategy)
+        if strategy:
+            strategy.on_trade_executed(signal, success=True)
+
+    def get_current_price(self, code: str, market: str) -> float:
+        """
+        현재가를 조회합니다.
+
+        Args:
+            code: 종목코드/티커
+            market: "KR" 또는 "US"
+
+        Returns:
+            현재가 (float). 실패 시 0.0.
+        """
+        try:
+            if market == "KR":
+                data = self.broker.get_kr_price(code)
+                return float(data["price"])
+            else:
+                exchange = get_us_exchange(code)
+                data = self.broker.get_us_price(code, exchange=exchange)
+                return float(data["price"])
+        except Exception as e:
+            logger.error(f"가격 조회 실패: {code} — {e}")
+            return 0.0
