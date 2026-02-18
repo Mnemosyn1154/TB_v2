@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -12,6 +13,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDateShort, formatPercent } from "@/lib/formatters";
 import { CHART_COLORS } from "@/lib/constants";
+import { downsample } from "@/lib/downsample";
 
 interface DrawdownChartProps {
   dates: string[];
@@ -19,13 +21,15 @@ interface DrawdownChartProps {
 }
 
 export function DrawdownChart({ dates, values }: DrawdownChartProps) {
-  // Calculate drawdown from equity curve
-  let peak = values[0];
-  const data = dates.map((date, i) => {
-    if (values[i] > peak) peak = values[i];
-    const dd = peak > 0 ? ((values[i] - peak) / peak) * 100 : 0;
-    return { date, drawdown: dd };
-  });
+  const data = useMemo(() => {
+    let peak = values[0];
+    const raw = dates.map((date, i) => {
+      if (values[i] > peak) peak = values[i];
+      const dd = peak > 0 ? ((values[i] - peak) / peak) * 100 : 0;
+      return { date, drawdown: dd };
+    });
+    return downsample(raw, 1000);
+  }, [dates, values]);
 
   return (
     <Card>
@@ -33,7 +37,7 @@ export function DrawdownChart({ dates, values }: DrawdownChartProps) {
         <CardTitle className="text-sm font-semibold">드로다운</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[200px]">
+        <div className="h-[180px] md:h-[200px]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data}>
               <defs>

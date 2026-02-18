@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   LineChart,
   Line,
@@ -11,6 +12,7 @@ import {
   Legend,
 } from "recharts";
 import { CHART_COLORS } from "@/lib/constants";
+import { downsample } from "@/lib/downsample";
 import type { BenchmarkData } from "@/types/benchmark";
 
 interface BenchmarkChartProps {
@@ -18,12 +20,21 @@ interface BenchmarkChartProps {
 }
 
 export function BenchmarkChart({ data }: BenchmarkChartProps) {
-  const chartData = data.dates.map((date, i) => ({
-    date,
-    portfolio: data.portfolio[i],
-    kospi: data.kospi[i],
-    sp500: data.sp500[i],
-  }));
+  const { chartData, yMin, yMax } = useMemo(() => {
+    const raw = data.dates.map((date, i) => ({
+      date,
+      portfolio: data.portfolio[i],
+      kospi: data.kospi[i],
+      sp500: data.sp500[i],
+    }));
+    const sampled = downsample(raw, 1000);
+    const allValues = sampled.flatMap((d) =>
+      [d.portfolio, d.kospi, d.sp500].filter((v): v is number => v != null)
+    );
+    const min = allValues.length > 0 ? Math.floor(Math.min(...allValues) - 2) : 0;
+    const max = allValues.length > 0 ? Math.ceil(Math.max(...allValues) + 2) : 100;
+    return { chartData: sampled, yMin: min, yMax: max };
+  }, [data]);
 
   if (chartData.length === 0) {
     return (
@@ -33,14 +44,8 @@ export function BenchmarkChart({ data }: BenchmarkChartProps) {
     );
   }
 
-  const allValues = chartData.flatMap((d) =>
-    [d.portfolio, d.kospi, d.sp500].filter((v): v is number => v != null)
-  );
-  const yMin = Math.floor(Math.min(...allValues) - 2);
-  const yMax = Math.ceil(Math.max(...allValues) + 2);
-
   return (
-    <div className="h-72 w-full md:h-80">
+    <div className="h-56 w-full sm:h-72 md:h-80">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 10 }}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />

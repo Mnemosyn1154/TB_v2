@@ -7,6 +7,7 @@ interface UseApiState<T> {
   data: T | null;
   error: string | null;
   loading: boolean;
+  lastUpdated: Date | null;
   refetch: () => Promise<void>;
 }
 
@@ -14,6 +15,7 @@ export function useApi<T>(fetcher: () => Promise<ApiResponse<T>>): UseApiState<T
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const refetch = useCallback(async () => {
     setLoading(true);
@@ -24,6 +26,7 @@ export function useApi<T>(fetcher: () => Promise<ApiResponse<T>>): UseApiState<T
         setError(res.error);
       } else {
         setData(res.data);
+        setLastUpdated(new Date());
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error");
@@ -36,5 +39,5 @@ export function useApi<T>(fetcher: () => Promise<ApiResponse<T>>): UseApiState<T
     refetch();
   }, [refetch]);
 
-  return { data, error, loading, refetch };
+  return { data, error, loading, lastUpdated, refetch };
 }

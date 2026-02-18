@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -13,6 +14,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatNumber, formatDateShort } from "@/lib/formatters";
 import { CHART_COLORS } from "@/lib/constants";
+import { downsample } from "@/lib/downsample";
 
 interface EquityCurveProps {
   dates: string[];
@@ -21,7 +23,10 @@ interface EquityCurveProps {
 }
 
 export function EquityCurve({ dates, values, initialCapital }: EquityCurveProps) {
-  const data = dates.map((date, i) => ({ date, value: values[i] }));
+  const data = useMemo(() => {
+    const raw = dates.map((date, i) => ({ date, value: values[i] }));
+    return downsample(raw, 1000);
+  }, [dates, values]);
 
   return (
     <Card>
@@ -29,7 +34,7 @@ export function EquityCurve({ dates, values, initialCapital }: EquityCurveProps)
         <CardTitle className="text-sm font-semibold">에퀴티 커브</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[300px]">
+        <div className="h-[220px] md:h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data}>
               <defs>

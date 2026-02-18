@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -36,7 +37,7 @@ function buildBins(values: number[], binCount = 20) {
 }
 
 export function PnlDistribution({ pnlValues }: PnlDistributionProps) {
-  const bins = buildBins(pnlValues);
+  const bins = useMemo(() => buildBins(pnlValues), [pnlValues]);
 
   if (bins.length === 0) {
     return (
@@ -59,7 +60,7 @@ export function PnlDistribution({ pnlValues }: PnlDistributionProps) {
         <CardTitle className="text-sm font-semibold">손익 분포</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[200px]">
+        <div className="h-[180px] md:h-[200px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={bins}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" />

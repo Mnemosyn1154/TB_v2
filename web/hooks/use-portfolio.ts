@@ -13,9 +13,9 @@ export function usePortfolio() {
     () => getPortfolio() as Promise<ApiResponse<PortfolioData>>,
     []
   );
-  const { data, error, loading, refetch } = useApi<PortfolioData>(fetcher);
+  const { data, error, loading, lastUpdated, refetch } = useApi<PortfolioData>(fetcher);
 
   useInterval(refetch, DEFAULTS.POLLING_INTERVAL);
 
-  return { data, error, loading, refetch };
+  return { data, error, loading, lastUpdated, refetch };
 }
