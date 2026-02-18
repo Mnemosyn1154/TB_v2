@@ -93,7 +93,6 @@ CLI (main.py) ─────────────────→ src/* → K
 
 예외:
 - Settings 라우트: Python API 거치지 않고 `config/settings.yaml` 직접 읽기/쓰기
-- Benchmark 라우트: Yahoo Finance API 직접 호출
 
 ## 디렉토리 맵
 
@@ -109,7 +108,7 @@ TB_v2/
 │   └── utils/               # 로거(loguru), 텔레그램 알림
 ├── pyapi/                   # FastAPI 서버 (src/ 래핑)
 │   ├── main.py              # FastAPI 앱 (CORS, 라우터 등록)
-│   ├── routers/             # portfolio, backtest, bot, signals, paper
+│   ├── routers/             # portfolio, backtest, bot, signals, paper, benchmark
 │   ├── deps.py              # verify_secret (X-Internal-Secret 검증)
 │   └── schemas.py           # BacktestRequest, ExecuteRequest
 ├── web/                     # Next.js 프론트엔드
@@ -183,7 +182,8 @@ python3 main.py backtest-yf -s stat_arb --start 2020-01-01 --end 2024-12-31
 ## 현재 상태
 
 - **Phase 1-9**: 모두 구현 완료 (docs/mainplan.md 참조)
-- **벤치마크 탭**: Yahoo Finance 연동 구현됨 (web/app/api/benchmark/route.ts)
+- **벤치마크 탭**: Python API 경유 DB 캐시 + yfinance 보충 (pyapi/routers/benchmark.py)
+- **시뮬레이션 모드**: SQLite 기반 가상 포트폴리오 (기본 OFF, `simulation.enabled` 토글)
 - **quant_factor 전략**: settings.yaml에서 disabled (enabled: false)
 - **테스트**: 미구현 (테스트 플랜은 docs/TEST_PLAN.md에 작성됨)
 - **Settings API**: Python API 없이 Next.js에서 settings.yaml 직접 읽기/쓰기

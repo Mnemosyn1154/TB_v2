@@ -23,7 +23,15 @@
 
 | Method | Path | 설명 |
 |--------|------|------|
-| GET | `/py/portfolio` | 현재 포트폴리오 (보유 종목, 리스크 지표) |
+| GET | `/py/portfolio` | 현재 포트폴리오 (보유 종목, 리스크 지표, 시뮬레이션/실거래 자동 분기) |
+| GET | `/py/portfolio/capital` | 초기 자본금 + 현금 잔고 조회 (시뮬레이션 모드) |
+| POST | `/py/portfolio/capital` | 초기 자본금 설정 (포트폴리오 리셋) |
+| POST | `/py/portfolio/reset` | 포트폴리오 리셋 (초기 자본금 유지, 포지션 삭제) |
+
+**SetCapitalRequest** (POST body):
+```json
+{ "amount": 10000000 }
+```
 
 ### Backtest
 
@@ -98,6 +106,22 @@ Bot 실행 응답: `{ "data": { "log": "실행 로그 문자열" }, "error": nul
 ```
 `signal_index`가 null이면 모든 시그널 실행.
 
+### Benchmark
+
+| Method | Path | 설명 |
+|--------|------|------|
+| GET | `/py/benchmark/data` | 벤치마크 인덱스 가격 (KOSPI, S&P 500, DB 캐시 + yfinance 보충) |
+
+쿼리 파라미터: `?period=1M|3M|6M|1Y|ALL`
+
+응답 data:
+```json
+{
+  "kospi": { "dates": ["2024-01-02", ...], "prices": [2600.5, ...] },
+  "sp500": { "dates": ["2024-01-02", ...], "prices": [4750.2, ...] }
+}
+```
+
 ---
 
 ## Next.js API Routes
@@ -107,6 +131,8 @@ Bot 실행 응답: `{ "data": { "log": "실행 로그 문자열" }, "error": nul
 | Next.js Path | Method | Python Endpoint |
 |-------------|--------|-----------------|
 | `/api/portfolio` | GET | `/py/portfolio` |
+| `/api/portfolio/capital` | GET/POST | `/py/portfolio/capital` |
+| `/api/portfolio/reset` | POST | `/py/portfolio/reset` |
 | `/api/signals` | GET | `/py/signals` |
 | `/api/backtest/run` | POST | `/py/backtest/run` |
 | `/api/backtest/run-per-pair` | POST | `/py/backtest/run-per-pair` |
@@ -122,6 +148,7 @@ Bot 실행 응답: `{ "data": { "log": "실행 로그 문자열" }, "error": nul
 | `/api/paper/sessions/[id]/trades` | GET | `/py/paper/sessions/{id}/trades` |
 | `/api/paper/sessions/[id]/stop` | POST | `/py/paper/sessions/{id}/stop` |
 | `/api/paper/execute` | POST | `/py/paper/execute` |
+| `/api/benchmark` | GET | `/py/benchmark/data` |
 
 ### 직접 처리 라우트 (Python API 미사용)
 
@@ -132,9 +159,6 @@ Bot 실행 응답: `{ "data": { "log": "실행 로그 문자열" }, "error": nul
 | `/api/settings/strategies` | POST | settings.yaml에 새 전략 인스턴스 추가 |
 | `/api/settings/strategies/[key]` | DELETE | settings.yaml에서 전략 인스턴스 삭제 |
 | `/api/settings/strategies/[key]/toggle` | PATCH | 전략 enabled/disabled 토글 |
-| `/api/benchmark` | GET | yahoo-finance2로 KOSPI/S&P500 데이터 조회 |
-
-Benchmark 쿼리 파라미터: `?period=1M|3M|6M|1Y|ALL`
 
 ---
 
@@ -145,6 +169,9 @@ Benchmark 쿼리 파라미터: `?period=1M|3M|6M|1Y|ALL`
 ```typescript
 // Portfolio (5분 캐시)
 getPortfolio()
+getCapital()
+setCapital(amount: number)
+resetPortfolio()
 
 // Benchmark (15분 캐시)
 getBenchmark(period?: string)

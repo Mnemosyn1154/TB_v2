@@ -62,8 +62,9 @@ python3 main.py run
 
 ```
 Settings:  Browser → /api/settings → config/settings.yaml 직접 읽기/쓰기 (Python API 없음)
-Benchmark: Browser → /api/benchmark → yahoo-finance2 패키지 직접 호출 (Python API 없음)
 ```
+
+Benchmark는 Python API 경유 (`/py/benchmark/data` → SQLite 캐시 + yfinance 보충).
 
 ## 인증 체계
 
@@ -126,6 +127,28 @@ CREATE TABLE IF NOT EXISTS trades (
 );
 ```
 
+-- 시뮬레이션 포지션 (PortfolioTracker)
+CREATE TABLE IF NOT EXISTS sim_positions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE,
+    market TEXT NOT NULL,
+    side TEXT NOT NULL DEFAULT 'LONG',
+    quantity INTEGER NOT NULL,
+    entry_price REAL NOT NULL,
+    current_price REAL NOT NULL DEFAULT 0,
+    strategy TEXT NOT NULL DEFAULT '',
+    entry_time TEXT NOT NULL,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 시뮬레이션 설정 (키-값)
+CREATE TABLE IF NOT EXISTS sim_portfolio (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+```
+
 Paper trading 테이블은 `dashboard/services/paper_trading_service.py`에서 별도 관리.
 
 ## 전략 플러그인 시스템
@@ -154,6 +177,9 @@ def resolve_strategy(config_key: str, strat_config: dict) -> BaseStrategy:
 ### config/settings.yaml 구조
 
 ```yaml
+simulation:                   # 시뮬레이션 모드
+  enabled, initial_capital
+
 kis:                          # KIS API 브로커 설정
   base_url, paper_url, live_trading, rate_limit
 
