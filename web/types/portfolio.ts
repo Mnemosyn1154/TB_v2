@@ -4,23 +4,21 @@ export interface Position {
   quantity: number;
   avg_price: number;
   current_price: number;
-  pnl_pct: number;
-  value: number;
-  weight: number;
+  profit_pct: number;
+  profit_amt: number;
+  market: "KR" | "US";
 }
 
 export interface RiskSummary {
   total_equity: number;
   cash: number;
-  cash_pct: number;
+  cash_pct: string;
   daily_pnl: number;
-  drawdown: number;
-  mdd: number;
+  drawdown: string;
   positions_count: number;
   max_positions: number;
   kill_switch: boolean;
-  sharpe_ratio: number;
-  sortino_ratio: number;
+  positions: { code: string; side: string; pnl_pct: string; value: number }[];
 }
 
 export interface StrategyStatus {
@@ -31,9 +29,16 @@ export interface StrategyStatus {
   positions_count: number;
 }
 
+export interface MarketBalance {
+  positions: Position[];
+  total_equity?: number;
+  cash?: number;
+  total_value?: number;
+}
+
 export interface PortfolioData {
-  kr: { total_equity: number; cash: number; positions: Position[] };
-  us: { total_equity: number; cash: number; positions: Position[] };
+  kr: MarketBalance;
+  us: MarketBalance;
   risk: RiskSummary;
-  strategies: StrategyStatus[];
+  strategies?: StrategyStatus[];
 }
