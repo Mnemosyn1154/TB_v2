@@ -9,6 +9,8 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -16,10 +18,16 @@ from pyapi.routers import portfolio, backtest, bot, signals, paper
 
 app = FastAPI(title="D2trader Python API", version="0.1.0")
 
-# CORS — 개발 시 Next.js에서의 직접 호출 허용
+# CORS — 허용 오리진 설정
+# 환경변수 ALLOWED_ORIGINS로 프로덕션 도메인 추가 가능 (콤마 구분)
+# 예: ALLOWED_ORIGINS=https://d2trader.your-domain.com,https://www.d2trader.your-domain.com
+_default_origins = ["http://localhost:3000"]
+_extra_origins = os.environ.get("ALLOWED_ORIGINS", "")
+_origins = _default_origins + [o.strip() for o in _extra_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -1,0 +1,30 @@
+# ============================================================
+# D2trader Python API — systemd 서비스 파일
+# ============================================================
+#
+# 설치:
+#   sudo cp d2trader-pyapi.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable d2trader-pyapi
+#   sudo systemctl start d2trader-pyapi
+#
+# 로그 확인:
+#   sudo journalctl -u d2trader-pyapi -f
+#
+# ============================================================
+
+[Unit]
+Description=D2trader Python API (FastAPI)
+After=network.target
+
+[Service]
+Type=simple
+User=<USER>
+WorkingDirectory=/home/<USER>/TB_v2
+EnvironmentFile=/home/<USER>/TB_v2/.env
+ExecStart=/home/<USER>/TB_v2/.venv/bin/uvicorn pyapi.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
