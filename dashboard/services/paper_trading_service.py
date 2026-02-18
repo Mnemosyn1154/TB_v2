@@ -319,7 +319,12 @@ def get_session_history() -> list[dict]:
         ORDER BY created_at DESC
     """)
     df = pd.read_sql(query, engine)
-    return df.to_dict("records") if not df.empty else []
+    if df.empty:
+        return []
+    records = df.to_dict("records")
+    for r in records:
+        r["strategy_names"] = json.loads(r.get("strategy_names") or "[]")
+    return records
 
 
 def get_session_trade_summary(session_id: str) -> dict:

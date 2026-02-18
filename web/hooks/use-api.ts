@@ -24,12 +24,14 @@ export function useApi<T>(fetcher: () => Promise<ApiResponse<T>>): UseApiState<T
       const res = await fetcher();
       if (res.error) {
         setError(res.error);
+        setData(null);
       } else {
         setData(res.data);
         setLastUpdated(new Date());
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error");
+      setData(null);
     } finally {
       setLoading(false);
     }

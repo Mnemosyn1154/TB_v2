@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { useApi } from "@/hooks/use-api";
 import {
@@ -41,11 +41,17 @@ export function PaperTab() {
   const [trades, setTrades] = useState<PaperTrade[]>([]);
   const [creating, setCreating] = useState(false);
   const [executing, setExecuting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleCreateSession() {
     setCreating(true);
+    setError(null);
     try {
-      await createPaperSession();
+      const res = await createPaperSession();
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
       refetchActive();
       refetchSessions();
     } finally {
@@ -54,7 +60,12 @@ export function PaperTab() {
   }
 
   async function handleStopSession(id: string) {
-    await stopPaperSession(id);
+    setError(null);
+    const res = await stopPaperSession(id);
+    if (res.error) {
+      setError(res.error);
+      return;
+    }
     refetchActive();
     refetchSessions();
   }
@@ -62,13 +73,18 @@ export function PaperTab() {
   async function handleExecute() {
     if (!active) return;
     setExecuting(true);
+    setError(null);
     try {
-      await executePaperSignals(active.session_id);
+      const res = await executePaperSignals(active.session_id);
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
       // 거래 내역 새로고침
-      const res = (await getPaperTrades(
+      const tradesRes = (await getPaperTrades(
         active.session_id
       )) as ApiResponse<PaperTrade[]>;
-      if (res.data) setTrades(res.data);
+      if (tradesRes.data) setTrades(tradesRes.data);
     } finally {
       setExecuting(false);
     }
@@ -84,10 +100,11 @@ export function PaperTab() {
     }
   }, [active?.session_id]);
 
-  // active가 로드되면 trades도 로드
-  if (active?.session_id && trades.length === 0 && !executing) {
-    loadTrades();
-  }
+  useEffect(() => {
+    if (active?.session_id) {
+      loadTrades();
+    }
+  }, [active?.session_id, loadTrades]);
 
   if (activeLoading && sessionsLoading) {
     return (
@@ -100,6 +117,12 @@ export function PaperTab() {
   return (
     <div className="flex flex-col gap-6">
       <h2 className="text-lg font-semibold">모의거래</h2>
+
+      {error && (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
 
       <section>
         <h3 className="mb-3 text-sm font-semibold text-muted-foreground">

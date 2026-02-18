@@ -29,11 +29,18 @@ async function fetchApi<T>(
   path: string,
   options?: RequestInit
 ): Promise<ApiResponse<T>> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
-  return res.json();
+  try {
+    const res = await fetch(`${BASE_URL}${path}`, {
+      headers: { "Content-Type": "application/json" },
+      ...options,
+    });
+    return res.json();
+  } catch (e) {
+    return {
+      data: null,
+      error: e instanceof Error ? e.message : "Network error",
+    } as ApiResponse<T>;
+  }
 }
 
 async function fetchCached<T>(
