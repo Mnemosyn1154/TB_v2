@@ -53,10 +53,10 @@ class QuantFactorStrategy(BaseStrategy):
     3. Momentum: 최근 N개월 수익률 (상승 추세 종목 선호)
     """
 
-    def __init__(self):
-        super().__init__("QuantFactor")
+    def __init__(self, config_key: str | None = None):
+        super().__init__("QuantFactor", config_key=config_key)
         config = get_config()
-        qf_config = config["strategies"]["quant_factor"]
+        qf_config = config["strategies"][self.config_key]
 
         self.top_n: int = qf_config["top_n"]
         self.rebalance_months: int = qf_config["rebalance_months"]
@@ -89,7 +89,7 @@ class QuantFactorStrategy(BaseStrategy):
     # ──────────────────────────────────────────────
 
     def get_config_key(self) -> str:
-        return "quant_factor"
+        return getattr(self, "config_key", "quant_factor")
 
     def required_codes(self) -> list[dict[str, str]]:
         """필요 종목 코드 목록 (exchange 포함)"""

@@ -45,10 +45,10 @@ class DualMomentumStrategy(BaseStrategy):
     2. 절대 모멘텀: 선택된 시장 > 무위험수익률? → YES: 투자, NO: 안전자산
     """
 
-    def __init__(self):
-        super().__init__("DualMomentum")
+    def __init__(self, config_key: str | None = None):
+        super().__init__("DualMomentum", config_key=config_key)
         config = get_config()
-        dm_config = config["strategies"]["dual_momentum"]
+        dm_config = config["strategies"][self.config_key]
 
         self.lookback_months = dm_config["lookback_months"]
         self.rebalance_day = dm_config["rebalance_day"]
@@ -73,7 +73,7 @@ class DualMomentumStrategy(BaseStrategy):
     # ──────────────────────────────────────────────
 
     def get_config_key(self) -> str:
-        return "dual_momentum"
+        return getattr(self, "config_key", "dual_momentum")
 
     def required_codes(self) -> list[dict[str, str]]:
         """필요 종목 코드 목록 (exchange 포함)"""

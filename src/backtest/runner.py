@@ -141,11 +141,9 @@ class BacktestRunner:
         initial_capital: float = 10_000_000,
     ) -> dict[str, tuple[BacktestResult, dict]]:
         """모든 활성 전략 백테스트"""
-        from src.strategies import STRATEGY_REGISTRY
-
         results = {}
-        for name in STRATEGY_REGISTRY:
-            if self.config["strategies"].get(name, {}).get("enabled", False):
+        for name, cfg in self.config.get("strategies", {}).items():
+            if cfg.get("enabled", False):
                 try:
                     results[name] = self.run(name, start_date, end_date, initial_capital)
                 except Exception as e:
@@ -342,16 +340,12 @@ class BacktestRunner:
     # 전략 생성
     # ──────────────────────────────────────────────
 
-    @staticmethod
-    def _create_strategy(name: str) -> BaseStrategy:
-        """STRATEGY_REGISTRY에서 전략 인스턴스 생성"""
-        from src.strategies import STRATEGY_REGISTRY
+    def _create_strategy(self, name: str) -> BaseStrategy:
+        """설정 기반 전략 인스턴스 생성 (type 필드 지원)"""
+        from src.strategies import resolve_strategy
 
-        cls = STRATEGY_REGISTRY.get(name)
-        if cls is None:
-            available = list(STRATEGY_REGISTRY.keys())
-            raise ValueError(f"알 수 없는 전략: {name} (사용 가능: {available})")
-        return cls()
+        strat_config = self.config.get("strategies", {}).get(name, {})
+        return resolve_strategy(name, strat_config)
 
 
 # ──────────────────────────────────────────────

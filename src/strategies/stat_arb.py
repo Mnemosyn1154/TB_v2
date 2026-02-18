@@ -79,10 +79,10 @@ class StatArbStrategy(BaseStrategy):
     4. 숏 대신 인버스 ETF 활용
     """
 
-    def __init__(self):
-        super().__init__("StatArb")
+    def __init__(self, config_key: str | None = None):
+        super().__init__("StatArb", config_key=config_key)
         config = get_config()
-        sa_config = config["strategies"]["stat_arb"]
+        sa_config = config["strategies"][self.config_key]
 
         # 파라미터
         self.lookback = sa_config["lookback_window"]
@@ -120,7 +120,7 @@ class StatArbStrategy(BaseStrategy):
     # ──────────────────────────────────────────────
 
     def get_config_key(self) -> str:
-        return "stat_arb"
+        return getattr(self, "config_key", "stat_arb")
 
     def get_pair_names(self) -> list[str]:
         """사용 가능한 페어 이름 목록 반환"""

@@ -8,6 +8,7 @@ import { snakeToTitle } from "@/lib/strategy-utils";
 import { StrategyList } from "./strategy-list";
 import { StrategyEditor } from "./strategy-editor";
 import { UniverseViewer } from "./universe-viewer";
+import { StrategyCreateDialog } from "./strategy-create-dialog";
 import type { ApiResponse } from "@/types/common";
 
 interface SettingsData {
@@ -56,6 +57,15 @@ export function StrategyTab() {
     refetch();
   }
 
+  async function handleDelete(key: string) {
+    try {
+      await fetch(`/api/settings/strategies/${key}`, { method: "DELETE" });
+      refetch();
+    } catch {
+      // silently fail, refetch will show current state
+    }
+  }
+
   if (loading && !data) {
     return <LoadingSpinner />;
   }
@@ -74,12 +84,16 @@ export function StrategyTab() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h2 className="text-lg font-semibold">전략 설정</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">전략 설정</h2>
+        <StrategyCreateDialog onCreated={refetch} />
+      </div>
 
       <StrategyList
         strategies={strategies}
         onToggle={handleToggle}
         onEdit={setEditingKey}
+        onDelete={handleDelete}
       />
 
       {/* 유니버스 뷰어 - 각 전략별 */}

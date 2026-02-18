@@ -31,6 +31,7 @@ export function fieldLabel(field: string): string {
 /** Fields to exclude from numeric param extraction */
 const EXCLUDED_FIELDS = new Set([
   "enabled",
+  "type",
   "pairs",
   "universe_codes",
   "weights",

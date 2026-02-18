@@ -60,10 +60,11 @@ class BaseStrategy(ABC):
         - on_trade_executed(): 체결 콜백 — 내부 상태 동기화
     """
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, config_key: str | None = None):
         self.name = name
+        self.config_key = config_key or self.get_config_key()
         self.enabled = True
-        logger.info(f"전략 초기화: {name}")
+        logger.info(f"전략 초기화: {name} (config_key={self.config_key})")
 
     # ── 플러그인 인터페이스 ──
 

@@ -43,7 +43,7 @@ from src.core.data_manager import DataManager
 from src.core.risk_manager import RiskManager
 from src.execution.collector import DataCollector
 from src.execution.executor import OrderExecutor
-from src.strategies import STRATEGY_REGISTRY
+from src.strategies import STRATEGY_REGISTRY, resolve_strategy
 from src.strategies.base import BaseStrategy
 from src.utils.notifier import TelegramNotifier
 
@@ -74,9 +74,9 @@ class AlgoTrader:
 
         # ── 전략 초기화 (레지스트리 기반) ──
         self.strategies: list[BaseStrategy] = []
-        for config_key, StrategyCls in STRATEGY_REGISTRY.items():
-            if self.config["strategies"][config_key]["enabled"]:
-                self.strategies.append(StrategyCls())
+        for config_key, strat_config in self.config["strategies"].items():
+            if strat_config.get("enabled", False):
+                self.strategies.append(resolve_strategy(config_key, strat_config))
 
         logger.info(f"활성 전략: {[s.name for s in self.strategies]}")
 
@@ -188,8 +188,8 @@ class AlgoTrader:
             keys_to_test = [strategy_name]
         else:
             keys_to_test = [
-                key for key, cls in STRATEGY_REGISTRY.items()
-                if self.config["strategies"].get(key, {}).get("enabled", False)
+                key for key, cfg in self.config["strategies"].items()
+                if cfg.get("enabled", False)
             ]
 
         if not keys_to_test:

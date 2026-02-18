@@ -22,6 +22,20 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "quant_factor": QuantFactorStrategy,
 }
 
+
+def resolve_strategy(config_key: str, strat_config: dict) -> BaseStrategy:
+    """config_key와 설정으로부터 전략 인스턴스 생성.
+
+    strat_config에 'type' 필드가 있으면 해당 타입의 클래스를 사용하고,
+    없으면 config_key 자체를 타입으로 사용 (하위 호환).
+    """
+    type_name = strat_config.get("type", config_key)
+    cls = STRATEGY_REGISTRY.get(type_name)
+    if not cls:
+        raise ValueError(f"Unknown strategy type: {type_name}")
+    return cls(config_key=config_key)
+
+
 __all__ = [
     "BaseStrategy",
     "TradeSignal",
@@ -30,4 +44,5 @@ __all__ = [
     "DualMomentumStrategy",
     "QuantFactorStrategy",
     "STRATEGY_REGISTRY",
+    "resolve_strategy",
 ]
