@@ -25,9 +25,12 @@
 - Python API 5개 라우터 (portfolio, backtest, bot, signals, paper)
 - 웹 대시보드 6탭 전체 구현 및 백엔드 연동
 - KIS API 통합 (실매매 + 모의투자)
-- 백테스트 엔진 (3개 전략, yfinance 기반)
+- 백테스트 엔진 (3개 전략, yfinance 기반, inf/NaN 안전 직렬화)
+- 백테스트 실행 로그 (전략별 사람이 읽을 수 있는 요약)
 - 전략 인스턴스 CRUD (웹에서 전략 생성/삭제)
+- 전략 파라미터 편집 (숫자/문자열 + pairs + universe_codes)
 - 동적 전략 UI (settings.yaml 변경 자동 반영)
+- 페이퍼 트레이딩 에러 핸들링 (세션별 오류 분리)
 - 다크 모드 (기본값)
 - Cloudflare Pages + Tunnel 배포 파이프라인
 
@@ -43,13 +46,18 @@
 
 | 전략 | 상태 | 주요 설정 |
 |------|------|----------|
-| stat_arb | ENABLED | 2개 페어 (Samsung_Hynix KR, MSFT_GOOGL US) |
+| stat_arb | ENABLED | MSFT_GOOGL US 페어 (인스턴스 분리 가능) |
 | dual_momentum | ENABLED | KR/US ETF 페어, 월 1일 리밸런싱 |
 | quant_factor | DISABLED | 멀티팩터 스코어링, 20+ 종목 유니버스 |
 
 ## 최근 주요 변경 (2026-02-18)
 
-1. **전략 인스턴스 CRUD**: 웹 UI에서 전략 생성/삭제 가능 (POST/DELETE /api/settings/strategies)
-2. **동적 전략 UI**: 하드코딩 전략명 제거, settings.yaml에서 동적 로딩
-3. **다크 모드 가시성**: OKLCH lightness 조정으로 대비 개선
-4. **코드 리뷰 P0 수정**: 보안, 성능, 비동기 관련 5개 크리티컬 이슈 해결
+1. **전략 파라미터 편집 확장**: pairs, universe_codes, 문자열 파라미터(ETF 코드 등) 편집 가능
+2. **백테스트 안정화**: inf/NaN 안전 직렬화 (`_SafeEncoder`), null-safe KPI 표시
+3. **백테스트 실행 로그**: 전략별 사람이 읽을 수 있는 요약 메시지 (공적분 결과, 모멘텀 비교 등)
+4. **거래 내역 개선**: 총 매매금액(amount) 컬럼 추가
+5. **페이퍼 트레이딩**: 세션별 에러 핸들링 개선 (PR #9)
+6. **전략 인스턴스 CRUD**: 웹 UI에서 전략 생성/삭제 가능
+7. **동적 전략 UI**: 하드코딩 전략명 제거, settings.yaml에서 동적 로딩
+8. **다크 모드 가시성**: OKLCH lightness 조정으로 대비 개선
+9. **코드 리뷰 P0 수정**: 보안, 성능, 비동기 관련 5개 크리티컬 이슈 해결
