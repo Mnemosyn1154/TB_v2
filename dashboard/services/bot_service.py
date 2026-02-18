@@ -128,6 +128,10 @@ def run_once() -> dict:
         if all_signals:
             notifier.notify_signal("AlgoTrader", all_signals)
         executor.execute_signals(all_signals)
+
+        # 시뮬레이션 포트폴리오 스냅샷 저장
+        if tracker:
+            tracker.save_snapshot()
     finally:
         logger.remove(handler_id)
 

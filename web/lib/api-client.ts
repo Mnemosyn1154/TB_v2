@@ -19,6 +19,19 @@ function setCache(key: string, data: unknown, ttlMs: number) {
   cache.set(key, { data, expiry: Date.now() + ttlMs });
 }
 
+/** 특정 경로 또는 전체 캐시 무효화 */
+export function invalidateCache(pathPrefix?: string) {
+  if (!pathPrefix) {
+    cache.clear();
+    return;
+  }
+  for (const key of cache.keys()) {
+    if (key.startsWith(pathPrefix)) {
+      cache.delete(key);
+    }
+  }
+}
+
 // Cache TTL constants (ms)
 const CACHE_TTL = {
   PORTFOLIO: 5 * 60 * 1000,  // 5분

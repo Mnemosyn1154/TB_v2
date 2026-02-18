@@ -106,3 +106,29 @@ def get_benchmark_data(
             result[key] = {"dates": [], "prices": []}
 
     return {"data": result, "error": None}
+
+
+@router.get("/benchmark/portfolio-series")
+def get_portfolio_series(
+    period: str = Query("3M"),
+    secret: None = Depends(verify_secret),
+):
+    """시뮬레이션 포트폴리오 일별 시계열 (스냅샷 기반)"""
+    from datetime import datetime, timedelta
+
+    from src.core.portfolio_tracker import PortfolioTracker
+
+    days = PERIOD_DAYS.get(period, 90)
+    start_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+
+    try:
+        tracker = PortfolioTracker()
+        snapshots = tracker.get_snapshots(start_date)
+        if not snapshots:
+            return {"data": {"dates": [], "values": []}, "error": None}
+
+        dates = [s["date"] for s in snapshots]
+        values = [s["total_value"] for s in snapshots]
+        return {"data": {"dates": dates, "values": values}, "error": None}
+    except Exception as e:
+        return {"data": {"dates": [], "values": []}, "error": str(e)}

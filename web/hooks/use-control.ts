@@ -9,6 +9,7 @@ import {
   getBotStatus,
   runBot,
   collectData,
+  invalidateCache,
 } from "@/lib/api-client";
 import type { KillSwitchStatus, BotStatus, TradingMode, LogEntry } from "@/types/control";
 import type { ApiResponse } from "@/types/common";
@@ -80,6 +81,9 @@ export function useBotExecution() {
       });
     } finally {
       setRunning(false);
+      // 포트폴리오/벤치마크 캐시 무효화 — 탭 전환 시 최신 데이터 표시
+      invalidateCache("/portfolio");
+      invalidateCache("/benchmark");
     }
   }, []);
 

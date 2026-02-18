@@ -64,6 +64,15 @@ class PortfolioTracker:
                     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
                 )
             """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS sim_portfolio_snapshots (
+                    date TEXT PRIMARY KEY,
+                    cash REAL NOT NULL,
+                    equity REAL NOT NULL,
+                    total_value REAL NOT NULL,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
             conn.commit()
 
     # ──────────────────────────────────────────────
@@ -264,6 +273,48 @@ class PortfolioTracker:
             "total_equity": total_equity,
             "total_value": cash + total_equity,
         }
+
+    # ──────────────────────────────────────────────
+    # 스냅샷 (일별 포트폴리오 기록)
+    # ──────────────────────────────────────────────
+
+    def save_snapshot(self) -> None:
+        """오늘 날짜로 포트폴리오 스냅샷 저장 (UPSERT)"""
+        summary = self.get_portfolio_summary()
+        today = datetime.now().strftime("%Y-%m-%d")
+        with self.engine.connect() as conn:
+            conn.execute(text("""
+                INSERT INTO sim_portfolio_snapshots (date, cash, equity, total_value, created_at)
+                VALUES (:date, :cash, :equity, :total, :now)
+                ON CONFLICT(date) DO UPDATE SET
+                    cash = :cash, equity = :equity, total_value = :total, created_at = :now
+            """), {
+                "date": today,
+                "cash": summary["cash"],
+                "equity": summary["total_equity"],
+                "total": summary["total_value"],
+                "now": datetime.now().isoformat(),
+            })
+            conn.commit()
+        logger.info(f"포트폴리오 스냅샷 저장: {today} — 총 {summary['total_value']:,.0f}")
+
+    def get_snapshots(self, start_date: str = "") -> list[dict]:
+        """포트폴리오 스냅샷 조회"""
+        with self.engine.connect() as conn:
+            if start_date:
+                rows = conn.execute(text(
+                    "SELECT date, cash, equity, total_value FROM sim_portfolio_snapshots "
+                    "WHERE date >= :start ORDER BY date ASC"
+                ), {"start": start_date}).fetchall()
+            else:
+                rows = conn.execute(text(
+                    "SELECT date, cash, equity, total_value FROM sim_portfolio_snapshots "
+                    "ORDER BY date ASC"
+                )).fetchall()
+        return [
+            {"date": r[0], "cash": r[1], "equity": r[2], "total_value": r[3]}
+            for r in rows
+        ]
 
     # ──────────────────────────────────────────────
     # 리셋

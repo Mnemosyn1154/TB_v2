@@ -68,9 +68,33 @@ export async function GET(request: NextRequest) {
     const kospiNorm = normalize(kospi.prices);
     const sp500Norm = normalize(sp500.prices);
 
-    // 포트폴리오 수익률은 아직 시계열이 없으므로 KOSPI 기준 +alpha 시뮬레이션
-    // TODO: 실제 포트폴리오 시계열 연동
-    const portfolioNorm = kospiNorm.map((v) => +(v * 1.02).toFixed(2));
+    // 포트폴리오 시계열: 시뮬레이션 스냅샷 기반
+    let portfolioNorm: number[];
+    try {
+      const portRes = (await pythonGet(
+        `/py/benchmark/portfolio-series?period=${encodeURIComponent(period)}`
+      )) as { data: { dates: string[]; values: number[] }; error: string | null };
+
+      if (!portRes.error && portRes.data.dates.length >= 2) {
+        // 스냅샷 날짜를 벤치마크 날짜에 맞추어 정렬
+        const portMap = new Map<string, number>();
+        portRes.data.dates.forEach((d, i) => portMap.set(d, portRes.data.values[i]));
+
+        // dates에 매칭되는 값을 채우고, 없으면 이전 값으로 forward-fill
+        const rawPort: number[] = [];
+        let lastVal = portRes.data.values[0];
+        for (const d of dates) {
+          if (portMap.has(d)) lastVal = portMap.get(d)!;
+          rawPort.push(lastVal);
+        }
+        portfolioNorm = normalize(rawPort);
+      } else {
+        // 스냅샷 없으면 fallback: 100 고정 (수평선)
+        portfolioNorm = dates.map(() => 100);
+      }
+    } catch {
+      portfolioNorm = dates.map(() => 100);
+    }
 
     const portRet = dailyReturns(kospi.prices.map((_, i) => portfolioNorm[i] ?? 100));
     const kospiRet = dailyReturns(kospi.prices);
