@@ -12,7 +12,9 @@ import {
   Moon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { TABS, type TabKey } from "@/lib/constants";
+import type { TradingMode } from "@/types/control";
 
 const ICON_MAP = {
   BarChart3,
@@ -26,19 +28,31 @@ const ICON_MAP = {
 interface DashboardHeaderProps {
   activeTab: TabKey;
   onTabChange: (tab: TabKey) => void;
+  tradingMode?: TradingMode;
 }
 
 export function DashboardHeader({
   activeTab,
   onTabChange,
+  tradingMode,
 }: DashboardHeaderProps) {
   const { theme, setTheme } = useTheme();
 
   return (
     <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
-        {/* Logo */}
-        <h1 className="text-lg font-bold tracking-tight">D2trader</h1>
+        {/* Logo + Mode */}
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg font-bold tracking-tight">D2trader</h1>
+          {tradingMode && (
+            <Badge
+              variant={tradingMode === "live" ? "destructive" : "secondary"}
+              className="text-[10px] px-1.5 py-0"
+            >
+              {tradingMode === "live" ? "실거래" : "모의"}
+            </Badge>
+          )}
+        </div>
 
         {/* Tabs */}
         <nav className="hidden md:flex items-center gap-1">

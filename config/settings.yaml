@@ -1,169 +1,225 @@
-# ============================================================
-# AlgoTrader KR — 설정 파일
-# ============================================================
-
-# KIS API 설정
 kis:
-  base_url: "https://openapi.koreainvestment.com:9443"
-  # 모의투자 URL (Paper Trading)
-  paper_url: "https://openapivts.koreainvestment.com:29443"
-  # 실거래 모드: false = 모의투자, true = 실거래
+  base_url: https://openapi.koreainvestment.com:9443
+  paper_url: https://openapivts.koreainvestment.com:29443
   live_trading: false
-  # API 호출 제한: 초당 최대 10건
   rate_limit: 10
-
-# 전략 설정
 strategies:
-  # 통계적 차익거래 (Pairs Trading)
   stat_arb:
     enabled: true
     pairs:
-      # 한국 페어
-      - name: "Samsung_Hynix"
-        market: "KR"
-        stock_a: "005930"       # 삼성전자
-        stock_b: "000660"       # SK하이닉스
-        hedge_etf: "114800"     # KODEX 인버스
-      # 미국 페어
-      - name: "MSFT_GOOGL"
-        market: "US"
-        stock_a: "MSFT"
-        stock_b: "GOOGL"
-        hedge_etf: "PSQ"        # 나스닥 인버스
-        exchange_a: "NAS"       # MSFT → NASDAQ
-        exchange_b: "NAS"       # GOOGL → NASDAQ
-        exchange_hedge: "NAS"   # PSQ → NASDAQ
-    # 시그널 파라미터
-    lookback_window: 60         # 롤링 윈도우 (일)
-    entry_z_score: 2.0          # 진입 Z-Score
-    exit_z_score: 0.5           # 청산 Z-Score
-    stop_loss_z_score: 3.5      # 손절 Z-Score
-    recalc_beta_days: 30        # 헤지 비율 재계산 주기
-    coint_pvalue: 0.05          # 공적분 검정 p-value 임계값
-
-  # 듀얼 모멘텀
+      - name: Samsung_Hynix
+        market: KR
+        stock_a: '005930'
+        stock_b: '000660'
+        hedge_etf: '114800'
+      - name: MSFT_GOOGL
+        market: US
+        stock_a: MSFT
+        stock_b: GOOGL
+        hedge_etf: PSQ
+        exchange_a: NAS
+        exchange_b: NAS
+        exchange_hedge: NAS
+    lookback_window: 60
+    entry_z_score: 2
+    exit_z_score: 0.5
+    stop_loss_z_score: 3.5
+    recalc_beta_days: 30
+    coint_pvalue: 0.05
   dual_momentum:
     enabled: true
     lookback_months: 12
-    rebalance_day: 1            # 매월 N번째 거래일
-    kr_etf: "069500"            # KODEX 200
-    us_etf: "SPY"
-    us_etf_exchange: "NYS"      # SPY → NYSE Arca
-    safe_kr_etf: "148070"       # KOSEF 국고채10년
-    safe_us_etf: "SHY"
-    safe_us_etf_exchange: "NYS" # SHY → NYSE Arca
-    risk_free_rate: 0.04        # 무위험수익률 (연)
-
-  # 퀀트 팩터 (멀티팩터 스코어링)
+    rebalance_day: 1
+    kr_etf: '069500'
+    us_etf: SPY
+    us_etf_exchange: NYS
+    safe_kr_etf: '148070'
+    safe_us_etf: SHY
+    safe_us_etf_exchange: NYS
+    risk_free_rate: 0.04
   quant_factor:
-    enabled: false              # Phase 3에서 활성화
-    top_n: 20                   # 상위 N종목 보유
-    rebalance_months: 1         # 리밸런싱 주기 (월)
-    lookback_days: 252          # Value 팩터 룩백 (거래일)
-    momentum_days: 126          # Momentum 팩터 룩백 (약 6개월)
-    volatility_days: 60         # Quality 팩터 변동성 윈도우
-    min_data_days: 60           # 최소 필요 데이터 일수
+    enabled: false
+    top_n: 20
+    rebalance_months: 1
+    lookback_days: 252
+    momentum_days: 126
+    volatility_days: 60
+    min_data_days: 60
     weights:
-      value: 0.3                # 가치 팩터 가중치
-      quality: 0.3              # 퀄리티 팩터 가중치
-      momentum: 0.4             # 모멘텀 팩터 가중치
-    # 유니버스 종목 (KOSPI200 + S&P500 대표주)
+      value: 0.3
+      quality: 0.3
+      momentum: 0.4
     universe_codes:
-      # ── 한국 대형주 (KOSPI200 상위) ──
-      - { code: "005930", market: "KR", name: "삼성전자" }
-      - { code: "000660", market: "KR", name: "SK하이닉스" }
-      - { code: "373220", market: "KR", name: "LG에너지솔루션" }
-      - { code: "207940", market: "KR", name: "삼성바이오로직스" }
-      - { code: "005380", market: "KR", name: "현대차" }
-      - { code: "006400", market: "KR", name: "삼성SDI" }
-      - { code: "051910", market: "KR", name: "LG화학" }
-      - { code: "003670", market: "KR", name: "포스코퓨처엠" }
-      - { code: "005490", market: "KR", name: "POSCO홀딩스" }
-      - { code: "035420", market: "KR", name: "NAVER" }
-      - { code: "000270", market: "KR", name: "기아" }
-      - { code: "068270", market: "KR", name: "셀트리온" }
-      - { code: "035720", market: "KR", name: "카카오" }
-      - { code: "105560", market: "KR", name: "KB금융" }
-      - { code: "055550", market: "KR", name: "신한지주" }
-      - { code: "012330", market: "KR", name: "현대모비스" }
-      - { code: "066570", market: "KR", name: "LG전자" }
-      - { code: "028260", market: "KR", name: "삼성물산" }
-      - { code: "003550", market: "KR", name: "LG" }
-      - { code: "034730", market: "KR", name: "SK" }
-      - { code: "032830", market: "KR", name: "삼성생명" }
-      - { code: "096770", market: "KR", name: "SK이노베이션" }
-      - { code: "010130", market: "KR", name: "고려아연" }
-      - { code: "030200", market: "KR", name: "KT" }
-      - { code: "086790", market: "KR", name: "하나금융지주" }
-      # ── 미국 대형주 (S&P500 상위) ──
-      - { code: "AAPL",  market: "US", name: "Apple",           exchange: "NAS" }
-      - { code: "MSFT",  market: "US", name: "Microsoft",       exchange: "NAS" }
-      - { code: "GOOGL", market: "US", name: "Alphabet",        exchange: "NAS" }
-      - { code: "AMZN",  market: "US", name: "Amazon",          exchange: "NAS" }
-      - { code: "NVDA",  market: "US", name: "NVIDIA",          exchange: "NAS" }
-      - { code: "META",  market: "US", name: "Meta",            exchange: "NAS" }
-      - { code: "TSLA",  market: "US", name: "Tesla",           exchange: "NAS" }
-      - { code: "BRK.B", market: "US", name: "Berkshire",       exchange: "NYS" }
-      - { code: "JPM",   market: "US", name: "JPMorgan",        exchange: "NYS" }
-      - { code: "V",     market: "US", name: "Visa",            exchange: "NYS" }
-      - { code: "JNJ",   market: "US", name: "Johnson&Johnson", exchange: "NYS" }
-      - { code: "XOM",   market: "US", name: "ExxonMobil",      exchange: "NYS" }
-      - { code: "UNH",   market: "US", name: "UnitedHealth",    exchange: "NYS" }
-      - { code: "PG",    market: "US", name: "Procter&Gamble",  exchange: "NYS" }
-      - { code: "MA",    market: "US", name: "Mastercard",      exchange: "NYS" }
-
-# 리스크 관리
+      - code: '005930'
+        market: KR
+        name: 삼성전자
+      - code: '000660'
+        market: KR
+        name: SK하이닉스
+      - code: '373220'
+        market: KR
+        name: LG에너지솔루션
+      - code: '207940'
+        market: KR
+        name: 삼성바이오로직스
+      - code: '005380'
+        market: KR
+        name: 현대차
+      - code: '006400'
+        market: KR
+        name: 삼성SDI
+      - code: '051910'
+        market: KR
+        name: LG화학
+      - code: '003670'
+        market: KR
+        name: 포스코퓨처엠
+      - code: '005490'
+        market: KR
+        name: POSCO홀딩스
+      - code: '035420'
+        market: KR
+        name: NAVER
+      - code: '000270'
+        market: KR
+        name: 기아
+      - code: '068270'
+        market: KR
+        name: 셀트리온
+      - code: '035720'
+        market: KR
+        name: 카카오
+      - code: '105560'
+        market: KR
+        name: KB금융
+      - code: '055550'
+        market: KR
+        name: 신한지주
+      - code: '012330'
+        market: KR
+        name: 현대모비스
+      - code: '066570'
+        market: KR
+        name: LG전자
+      - code: '028260'
+        market: KR
+        name: 삼성물산
+      - code: '003550'
+        market: KR
+        name: LG
+      - code: '034730'
+        market: KR
+        name: SK
+      - code: '032830'
+        market: KR
+        name: 삼성생명
+      - code: '096770'
+        market: KR
+        name: SK이노베이션
+      - code: '010130'
+        market: KR
+        name: 고려아연
+      - code: '030200'
+        market: KR
+        name: KT
+      - code: '086790'
+        market: KR
+        name: 하나금융지주
+      - code: AAPL
+        market: US
+        name: Apple
+        exchange: NAS
+      - code: MSFT
+        market: US
+        name: Microsoft
+        exchange: NAS
+      - code: GOOGL
+        market: US
+        name: Alphabet
+        exchange: NAS
+      - code: AMZN
+        market: US
+        name: Amazon
+        exchange: NAS
+      - code: NVDA
+        market: US
+        name: NVIDIA
+        exchange: NAS
+      - code: META
+        market: US
+        name: Meta
+        exchange: NAS
+      - code: TSLA
+        market: US
+        name: Tesla
+        exchange: NAS
+      - code: BRK.B
+        market: US
+        name: Berkshire
+        exchange: NYS
+      - code: JPM
+        market: US
+        name: JPMorgan
+        exchange: NYS
+      - code: V
+        market: US
+        name: Visa
+        exchange: NYS
+      - code: JNJ
+        market: US
+        name: Johnson&Johnson
+        exchange: NYS
+      - code: XOM
+        market: US
+        name: ExxonMobil
+        exchange: NYS
+      - code: UNH
+        market: US
+        name: UnitedHealth
+        exchange: NYS
+      - code: PG
+        market: US
+        name: Procter&Gamble
+        exchange: NYS
+      - code: MA
+        market: US
+        name: Mastercard
+        exchange: NYS
 risk:
-  max_position_pct: 10.0        # 종목당 최대 비중 (%)
-  stop_loss_pct: -7.0           # 종목당 손절 (%)
-  daily_loss_limit_pct: -2.0    # 일일 최대 손실 (%)
-  max_drawdown_pct: -10.0       # 최대 드로다운 (%)
-  max_positions: 10             # 최대 동시 포지션
-  min_cash_pct: 20.0            # 최소 현금 비중 (%)
-
-# 알림 설정
+  max_position_pct: 10
+  stop_loss_pct: -7
+  daily_loss_limit_pct: -2
+  max_drawdown_pct: -10
+  max_positions: 10
+  min_cash_pct: 20
 notifications:
   telegram:
     enabled: true
-    # 토큰과 채팅 ID는 .env에서 관리
   alert_on:
     - trade_executed
     - stop_loss_triggered
     - strategy_signal
     - daily_summary
     - error
-
-# 데이터베이스
 database:
-  type: "sqlite"
-  path: "data/trading_bot.db"
-
-# 로깅
+  type: sqlite
+  path: data/trading_bot.db
 logging:
-  level: "INFO"
-  file: "logs/trading_bot.log"
-  rotation: "10 MB"
-  retention: "30 days"
-
-# 스케줄러
+  level: INFO
+  file: logs/trading_bot.log
+  rotation: 10 MB
+  retention: 30 days
 scheduler:
-  # 한국 시장 (KST)
-  kr_market_open: "09:00"
-  kr_market_close: "15:30"
-  # 미국 시장 (EST → KST 변환은 코드에서)
-  us_market_open: "09:30"
-  us_market_close: "16:00"
-
-# 백테스팅
+  kr_market_open: '09:00'
+  kr_market_close: '15:30'
+  us_market_open: '09:30'
+  us_market_close: '16:00'
 backtest:
-  initial_capital: 10000000     # 초기 자본금 (1,000만 원 KRW)
-  # 수수료 (비율)
-  commission_rate: 0.00015      # 편도 수수료율 (0.015%) — DB 백테스트용
-  commission_rate_kr: 0.00015   # KR 매매 수수료 0.015%
-  commission_rate_us: 0.0       # US 무수수료
-  tax_rate_kr: 0.0018           # KR 매도 거래세 0.18%
-  # 슬리피지
-  slippage_rate: 0.001          # 슬리피지율 (0.1%)
-  # 기본 기간
-  start_date: "2024-01-01"     # 시작일
-  end_date: "2025-12-31"       # 종료일
+  initial_capital: 10000000
+  commission_rate: 0.00015
+  commission_rate_kr: 0.00015
+  commission_rate_us: 0
+  tax_rate_kr: 0.0018
+  slippage_rate: 0.001
+  start_date: '2024-01-01'
+  end_date: '2025-12-31'
