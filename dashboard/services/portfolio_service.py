@@ -112,8 +112,18 @@ def _get_kis_portfolio() -> dict:
         kr_balance = broker.get_kr_balance()
         us_balance = broker.get_us_balance()
     except Exception as e:
+        err_msg = str(e)
+        if "403" in err_msg or "Forbidden" in err_msg:
+            err_msg = ("KIS API 인증 실패 (403 Forbidden). "
+                       "API 키/시크릿이 만료되었거나 유효하지 않습니다. "
+                       "시뮬레이션 모드를 사용하려면 settings.yaml에서 "
+                       "simulation.enabled: true로 설정하세요.")
+        elif "401" in err_msg or "Unauthorized" in err_msg:
+            err_msg = ("KIS API 인증 실패 (401). "
+                       "토큰이 만료되었습니다. data/kis_token_*.json 삭제 후 재시도하세요.")
+        logger.error(f"KIS 포트폴리오 조회 실패: {e}")
         return {
-            "error": str(e),
+            "error": err_msg,
             "kr": {},
             "us": {},
             "risk": _empty_risk(),

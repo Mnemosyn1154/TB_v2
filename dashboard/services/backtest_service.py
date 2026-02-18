@@ -7,7 +7,7 @@ from __future__ import annotations
 """
 from src.backtest.engine import BacktestResult
 from src.backtest.runner import BacktestRunner
-from src.backtest.runner import _get_db_engine, _load_prices_from_db as load_prices_from_db
+from src.backtest.runner import get_db_engine as _get_db_engine, _load_prices_from_db as load_prices_from_db
 
 
 def run_backtest(
