@@ -7,7 +7,7 @@ from __future__ import annotations
 
 Depends on:
     - src.core.data_feed (yfinance 데이터)
-    - src.backtest.runner (_save_prices_to_db, _get_db_engine)
+    - src.backtest.runner (save_prices_to_db, get_db_engine)
     - pyapi.deps (verify_secret)
 
 Used by:
@@ -46,7 +46,7 @@ def get_benchmark_data(
     from loguru import logger
     from sqlalchemy import text
 
-    from src.backtest.runner import _get_db_engine, _save_prices_to_db
+    from src.backtest.runner import get_db_engine, save_prices_to_db
 
     days = PERIOD_DAYS.get(period, 90)
     end_date = datetime.now()
@@ -54,7 +54,7 @@ def get_benchmark_data(
     start_str = start_date.strftime("%Y-%m-%d")
     end_str = end_date.strftime("%Y-%m-%d")
 
-    engine = _get_db_engine()
+    engine = get_db_engine()
 
     result = {}
     for key, info in INDEX_SYMBOLS.items():
@@ -87,7 +87,7 @@ def get_benchmark_data(
                 yf_df = feed.fetch(code, start_str, end_str, market="US")
                 if not yf_df.empty:
                     yf_df["market"] = market  # INDEX로 저장
-                    _save_prices_to_db(yf_df)
+                    save_prices_to_db(yf_df)
                     logger.info(f"벤치마크 DB 캐시: {code} — {len(yf_df)}건")
                     df = yf_df[["date", "close"]].copy()
                     df["date"] = df["date"].dt.strftime("%Y-%m-%d")

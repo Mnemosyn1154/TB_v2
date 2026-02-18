@@ -317,7 +317,7 @@ class BacktestRunner:
 
         # Cache to SQLite for subsequent runs
         for code, df in result.items():
-            saved = _save_prices_to_db(df)
+            saved = save_prices_to_db(df)
             if saved > 0:
                 logger.info(f"yfinance 데이터 DB 캐시: {code} — {saved}건")
 
@@ -360,7 +360,7 @@ class BacktestRunner:
 # DB 유틸리티 (대시보드 서비스에서 이전)
 # ──────────────────────────────────────────────
 
-def _get_db_engine():
+def get_db_engine():
     """SQLite 엔진"""
     db_path = DATA_DIR / "trading_bot.db"
     return create_engine(f"sqlite:///{db_path}")
@@ -368,7 +368,7 @@ def _get_db_engine():
 
 def _load_prices_from_db(code: str, market: str) -> pd.DataFrame:
     """SQLite에서 종가 데이터 로드"""
-    engine = _get_db_engine()
+    engine = get_db_engine()
     query = text("""
         SELECT date, open, high, low, close, volume
         FROM daily_prices
@@ -385,25 +385,12 @@ def _load_prices_from_db(code: str, market: str) -> pd.DataFrame:
     return df
 
 
-def _save_prices_to_db(df: pd.DataFrame) -> int:
+def save_prices_to_db(df: pd.DataFrame) -> int:
     """yfinance 데이터를 SQLite에 캐시 (중복 무시)"""
     if df.empty:
         return 0
 
-    engine = _get_db_engine()
-
-    # Ensure table exists
-    with engine.connect() as conn:
-        conn.execute(text("""
-            CREATE TABLE IF NOT EXISTS daily_prices (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                code TEXT NOT NULL, market TEXT NOT NULL, date TEXT NOT NULL,
-                open REAL, high REAL, low REAL, close REAL,
-                volume INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(code, market, date)
-            )
-        """))
-        conn.commit()
+    engine = get_db_engine()
 
     records = []
     for _, row in df.iterrows():
