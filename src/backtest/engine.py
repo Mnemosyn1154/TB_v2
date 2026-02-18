@@ -152,6 +152,12 @@ class BacktestEngine:
 
         logger.info(f"📅 백테스트 기간: {all_dates[0]} ~ {all_dates[-1]} ({len(all_dates)}일)")
 
+        # ── 가격 룩업 캐시 구축 (성능 최적화) ──
+        # 매일 pd.to_datetime 변환을 반복하지 않도록, 한 번에 {code: {date_str: close}} 구축
+        self._price_lookup = self._build_price_lookup(price_data)
+        # {code: [(date_str, close), ...]} 정렬된 리스트 (look-ahead bias 방지용)
+        self._price_series_cache = self._build_price_series_cache(price_data)
+
         # ── 일별 시뮬레이션 루프 ──
         for date in all_dates:
             day_prices = self._get_day_prices(price_data, date)
@@ -465,26 +471,74 @@ class BacktestEngine:
 
         return all_dates
 
+    def _build_price_lookup(self, price_data: dict[str, pd.DataFrame]) -> dict[str, dict[str, float]]:
+        """가격 룩업 테이블 구축: {code: {date_str: close_price}}
+
+        run() 시작 시 1회 구축하여, 매일 반복되는 날짜 변환을 제거합니다.
+        """
+        lookup: dict[str, dict[str, float]] = {}
+        for code, df in price_data.items():
+            code_prices: dict[str, float] = {}
+            if "date" in df.columns:
+                dates = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
+                for d, c in zip(dates, df["close"]):
+                    code_prices[d] = float(c)
+            elif isinstance(df.index, pd.DatetimeIndex):
+                dates = df.index.strftime("%Y-%m-%d")
+                for d, c in zip(dates, df["close"]):
+                    code_prices[d] = float(c)
+            lookup[code] = code_prices
+        return lookup
+
+    def _build_price_series_cache(self, price_data: dict[str, pd.DataFrame]) -> dict[str, list[tuple[str, float]]]:
+        """종가 시리즈 캐시 구축: {code: [(date_str, close), ...]} 날짜 오름차순 정렬
+
+        _get_prices_until()에서 bisect로 O(log n) 슬라이싱에 사용합니다.
+        """
+        cache: dict[str, list[tuple[str, float]]] = {}
+        for code, df in price_data.items():
+            pairs: list[tuple[str, float]] = []
+            if "date" in df.columns:
+                dates = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
+                for d, c in zip(dates, df["close"]):
+                    pairs.append((d, float(c)))
+            elif isinstance(df.index, pd.DatetimeIndex):
+                dates = df.index.strftime("%Y-%m-%d")
+                for d, c in zip(dates, df["close"]):
+                    pairs.append((d, float(c)))
+            pairs.sort(key=lambda x: x[0])
+            cache[code] = pairs
+        return cache
+
     def _get_day_prices(self, price_data: dict[str, pd.DataFrame],
                         date: str) -> dict[str, float]:
-        """특정 날짜의 종목별 종가를 반환"""
+        """특정 날짜의 종목별 종가를 반환 (캐시 룩업 O(1))"""
         prices = {}
-        for code, df in price_data.items():
-            if "date" in df.columns:
-                row = df[pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d") == date]
-            elif isinstance(df.index, pd.DatetimeIndex):
-                row = df[df.index.strftime("%Y-%m-%d") == date]
-            else:
-                continue
-
-            if not row.empty:
-                prices[code] = float(row.iloc[0]["close"])
-
+        for code, date_map in self._price_lookup.items():
+            price = date_map.get(date)
+            if price is not None:
+                prices[code] = price
         return prices
 
-    @staticmethod
-    def _get_prices_until(df: pd.DataFrame, date: str) -> pd.Series:
-        """특정 날짜까지의 종가 시리즈 반환 (look-ahead bias 방지)"""
+    def _get_prices_until(self, df: pd.DataFrame, date: str) -> pd.Series:
+        """특정 날짜까지의 종가 시리즈 반환 (look-ahead bias 방지, bisect O(log n))"""
+        from bisect import bisect_right
+
+        # df에서 code를 추출하여 캐시 참조
+        code = None
+        if "code" in df.columns and not df.empty:
+            code = df["code"].iloc[0]
+
+        if code and hasattr(self, "_price_series_cache") and code in self._price_series_cache:
+            pairs = self._price_series_cache[code]
+            # bisect_right: date 이하의 모든 항목을 슬라이싱
+            idx = bisect_right(pairs, (date, float("inf")))
+            if idx == 0:
+                return pd.Series(dtype=float)
+            values = [c for _, c in pairs[:idx]]
+            return pd.Series(values, dtype=float)
+
+        # 캐시 미스 시 기존 로직 폴백
         if "date" in df.columns:
             mask = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d") <= date
             return df.loc[mask, "close"].reset_index(drop=True)
