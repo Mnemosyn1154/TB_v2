@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { LastUpdated } from "@/components/common/last-updated";
 import { usePortfolio } from "@/hooks/use-portfolio";
+import { CapitalSettings } from "./capital-settings";
 import { PortfolioKPIs } from "./portfolio-kpis";
 import { StrategyCards } from "./strategy-cards";
 import { HoldingsTable } from "./holdings-table";
@@ -48,6 +49,14 @@ export function PortfolioTab() {
           새로고침
         </Button>
       </div>
+
+      {data.initial_capital !== undefined && (
+        <CapitalSettings
+          initialCapital={data.initial_capital}
+          cash={data.risk.cash}
+          onUpdate={refetch}
+        />
+      )}
 
       <PortfolioKPIs data={data} />
 

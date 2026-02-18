@@ -25,6 +25,7 @@ from loguru import logger
 from src.core.broker import KISBroker
 from src.core.data_manager import DataManager
 from src.core.exchange import get_us_exchange
+from src.core.portfolio_tracker import PortfolioTracker
 from src.core.risk_manager import RiskManager, Position
 from src.strategies.base import BaseStrategy, TradeSignal, Signal
 from src.utils.notifier import TelegramNotifier
@@ -45,11 +46,15 @@ class OrderExecutor:
 
     def __init__(self, broker: KISBroker, risk_manager: RiskManager,
                  data_manager: DataManager, notifier: TelegramNotifier,
-                 strategies: list[BaseStrategy] | None = None):
+                 strategies: list[BaseStrategy] | None = None,
+                 portfolio_tracker: PortfolioTracker | None = None,
+                 simulation_mode: bool = False):
         self.broker = broker
         self.risk_manager = risk_manager
         self.data_manager = data_manager
         self.notifier = notifier
+        self.portfolio_tracker = portfolio_tracker
+        self.simulation_mode = simulation_mode
 
         # 전략 이름 → 인스턴스 매핑 (체결 콜백용)
         self._strategies_by_name: dict[str, BaseStrategy] = {}
@@ -57,7 +62,8 @@ class OrderExecutor:
             for s in strategies:
                 self._strategies_by_name[s.name] = s
 
-        logger.info("OrderExecutor 초기화 완료")
+        mode_label = "시뮬레이션" if simulation_mode else "실거래"
+        logger.info(f"OrderExecutor 초기화 완료 (모드: {mode_label})")
 
     def execute_signals(self, signals: list[TradeSignal]) -> None:
         """
@@ -114,11 +120,19 @@ class OrderExecutor:
             return
 
         # 4. 주문 실행
-        if signal.market == "KR":
-            self.broker.order_kr_buy(signal.code, quantity)
+        if self.simulation_mode and self.portfolio_tracker:
+            success = self.portfolio_tracker.execute_buy(
+                signal.code, signal.market, quantity, price, signal.strategy,
+            )
+            if not success:
+                logger.warning(f"시뮬레이션 매수 실패 (현금 부족): {signal.code}")
+                return
         else:
-            exchange = get_us_exchange(signal.code, purpose="order")
-            self.broker.order_us_buy(signal.code, quantity, exchange=exchange)
+            if signal.market == "KR":
+                self.broker.order_kr_buy(signal.code, quantity)
+            else:
+                exchange = get_us_exchange(signal.code, purpose="order")
+                self.broker.order_us_buy(signal.code, quantity, exchange=exchange)
 
         # 5. 포지션 등록
         self.risk_manager.add_position(Position(
@@ -163,11 +177,17 @@ class OrderExecutor:
             return
 
         # 주문 실행
-        if signal.market == "KR":
-            self.broker.order_kr_sell(signal.code, quantity)
+        if self.simulation_mode and self.portfolio_tracker:
+            proceeds = self.portfolio_tracker.execute_sell(signal.code, price)
+            if proceeds == 0:
+                logger.warning(f"시뮬레이션 매도 실패 (포지션 없음): {signal.code}")
+                return
         else:
-            exchange = get_us_exchange(signal.code, purpose="order")
-            self.broker.order_us_sell(signal.code, quantity, exchange=exchange)
+            if signal.market == "KR":
+                self.broker.order_kr_sell(signal.code, quantity)
+            else:
+                exchange = get_us_exchange(signal.code, purpose="order")
+                self.broker.order_us_sell(signal.code, quantity, exchange=exchange)
 
         # 포지션 제거 + 기록 + 알림
         self.risk_manager.remove_position(signal.code)
@@ -187,7 +207,7 @@ class OrderExecutor:
 
     def get_current_price(self, code: str, market: str) -> float:
         """
-        현재가를 조회합니다.
+        현재가를 조회합니다 (KIS API → yfinance 폴백).
 
         Args:
             code: 종목코드/티커
@@ -205,5 +225,23 @@ class OrderExecutor:
                 data = self.broker.get_us_price(code, exchange=exchange)
                 return float(data["price"])
         except Exception as e:
-            logger.error(f"가격 조회 실패: {code} — {e}")
-            return 0.0
+            logger.warning(f"KIS 가격 조회 실패: {code} — {e}, yfinance 폴백 시도")
+            return self._get_price_yfinance(code, market)
+
+    @staticmethod
+    def _get_price_yfinance(code: str, market: str) -> float:
+        """yfinance를 이용한 현재가 폴백"""
+        try:
+            from src.core.data_feed import DataFeed
+            import yfinance as yf
+
+            symbol = DataFeed._to_yf_symbol(code, market)
+            ticker = yf.Ticker(symbol)
+            hist = ticker.history(period="1d")
+            if not hist.empty:
+                price = float(hist["Close"].iloc[-1])
+                logger.info(f"yfinance 가격 조회 성공: {code} = {price}")
+                return price
+        except Exception as e:
+            logger.error(f"yfinance 가격 조회 실패: {code} — {e}")
+        return 0.0

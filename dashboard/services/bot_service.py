@@ -86,7 +86,21 @@ def run_once() -> str:
     notifier = TelegramNotifier()
     strategies = _build_strategies()
     collector = DataCollector(broker, dm, strategies)
-    executor = OrderExecutor(broker, rm, dm, notifier)
+
+    # 시뮬레이션 모드 설정
+    from src.core.portfolio_tracker import PortfolioTracker, sync_risk_manager
+
+    sim_config = config.get("simulation", {})
+    simulation_mode = sim_config.get("enabled", False)
+    tracker = PortfolioTracker(dm.engine) if simulation_mode else None
+    if tracker:
+        sync_risk_manager(rm, tracker)
+
+    executor = OrderExecutor(
+        broker, rm, dm, notifier,
+        portfolio_tracker=tracker,
+        simulation_mode=simulation_mode,
+    )
 
     log_capture = io.StringIO()
     handler_id = logger.add(log_capture, format="{time:HH:mm:ss} | {level} | {message}")

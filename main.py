@@ -72,6 +72,19 @@ class AlgoTrader:
         self.risk_manager = RiskManager()
         self.notifier = TelegramNotifier()
 
+        # ── 시뮬레이션 모드 ──
+        from src.core.portfolio_tracker import PortfolioTracker, sync_risk_manager
+
+        sim_config = self.config.get("simulation", {})
+        self.simulation_mode = sim_config.get("enabled", False)
+
+        if self.simulation_mode:
+            self.portfolio_tracker = PortfolioTracker(self.data_manager.engine)
+            sync_risk_manager(self.risk_manager, self.portfolio_tracker)
+            logger.info("시뮬레이션 모드 활성화")
+        else:
+            self.portfolio_tracker = None
+
         # ── 전략 초기화 (레지스트리 기반) ──
         self.strategies: list[BaseStrategy] = []
         for config_key, strat_config in self.config["strategies"].items():
@@ -85,6 +98,8 @@ class AlgoTrader:
         self.executor = OrderExecutor(
             self.broker, self.risk_manager, self.data_manager, self.notifier,
             strategies=self.strategies,
+            portfolio_tracker=self.portfolio_tracker,
+            simulation_mode=self.simulation_mode,
         )
 
     # ──────────────────────────────────────────────
