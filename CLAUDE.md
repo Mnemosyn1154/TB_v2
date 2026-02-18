@@ -119,6 +119,10 @@ TB_v2/
 │   ├── hooks/               # useApi, usePortfolio, useBacktest 등
 │   ├── lib/                 # api-client, python-proxy, formatters, strategy-utils
 │   └── types/               # 도메인별 TypeScript 타입 정의
+├── tests/                   # pytest 테스트
+│   ├── conftest.py          # 공통 fixture (in-memory SQLite tracker)
+│   ├── test_simulation_e2e.py  # 시뮬레이션 E2E (매수/매도/P&L/스냅샷)
+│   └── test_strategies.py   # 전략 유닛 테스트 (StatArb/DualMomentum/QuantFactor)
 ├── dashboard/               # Streamlit 레거시 UI
 │   └── services/            # 비즈니스 로직 (일부 pyapi에서 import)
 ├── deploy/                  # systemd 서비스, Cloudflare Tunnel, deploy.sh
@@ -182,14 +186,19 @@ python3 main.py backtest-yf -s stat_arb --start 2020-01-01 --end 2024-12-31
 ## 현재 상태
 
 - **Phase 1-9**: 모두 구현 완료 (docs/mainplan.md 참조)
-- **벤치마크 탭**: Python API 경유 DB 캐시 + yfinance 보충 (pyapi/routers/benchmark.py)
+- **시뮬레이션 이슈 Phase 1-4**: 모두 수정 완료 (docs/SIMULATION_ISSUES.md 참조)
+- **벤치마크 탭**: Python API 경유 DB 캐시 + yfinance 보충 + 포트폴리오 시계열 연동
 - **시뮬레이션 모드**: SQLite 기반 가상 포트폴리오 (기본 ON, `simulation.enabled` 토글)
+  - 실주문 차단 가드, DB 트랜잭션, 포지션 가격 갱신, 스냅샷 기록
 - **Python 3.12**: pyenv로 3.12.12 사용 (`.python-version`), 3.10+ 타입 문법 지원
 - **quant_factor 전략**: settings.yaml에서 disabled (enabled: false)
-- **테스트**: 미구현 (테스트 플랜은 docs/TEST_PLAN.md에 작성됨)
+- **테스트**: 49 tests 통과 (`python -m pytest tests/`)
+  - `tests/test_simulation_e2e.py` — PortfolioTracker E2E (13 tests)
+  - `tests/test_strategies.py` — StatArb/DualMomentum/QuantFactor 유닛 (36 tests)
 - **Settings API**: Python API 없이 Next.js에서 settings.yaml 직접 읽기/쓰기
 - **전략 편집**: StrategyEditor에서 숫자/문자열 파라미터, pairs, universe_codes 편집 가능
 - **백테스트**: inf/NaN 안전 직렬화, 사람이 읽을 수 있는 실행 로그 제공
+- **대시보드 UX**: 토스트 에러 알림, bot/run 후 캐시 자동 무효화
 
 ## 문서 인덱스
 
@@ -203,5 +212,6 @@ python3 main.py backtest-yf -s stat_arb --start 2020-01-01 --end 2024-12-31
 | `docs/WEB_PROJECT_SPEC.md` | 웹 대시보드 기술 사양서 |
 | `docs/SETUP_GUIDE.md` | 개발 환경 셋업 가이드 |
 | `docs/TEST_PLAN.md` | 테스트 전략 및 케이스 |
+| `docs/SIMULATION_ISSUES.md` | 시뮬레이션 이슈 분석 & 수정 이력 (Phase 1-4 완료) |
 | `docs/DESIGN_SYSTEM.md` | 디자인 토큰, 색상, 타이포그래피 |
 | `src/*/README.md` | 모듈별 문서 (5개 파일) |
