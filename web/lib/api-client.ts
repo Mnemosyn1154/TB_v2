@@ -28,6 +28,13 @@ export const updateSettings = (data: unknown) =>
 // Backtest
 export const runBacktest = (params: unknown) =>
   fetchApi("/backtest/run", { method: "POST", body: JSON.stringify(params) });
+export const runBacktestPerPair = (params: unknown) =>
+  fetchApi("/backtest/run-per-pair", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+export const getBacktestPairs = (strategy: string) =>
+  fetchApi(`/backtest/pairs/${strategy}`);
 
 // Bot
 export const runBot = () => fetchApi("/bot/run", { method: "POST" });
