@@ -1,0 +1,29 @@
+# ============================================================
+# Cloudflare Tunnel 설정 — D2trader Python API
+# ============================================================
+#
+# 사전 준비:
+#   1. cloudflared 설치: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/
+#   2. 로그인: cloudflared tunnel login
+#   3. 터널 생성: cloudflared tunnel create d2trader-api
+#   4. DNS 레코드 추가: cloudflared tunnel route dns d2trader-api api.d2trader.your-domain.com
+#   5. 이 파일을 ~/.cloudflared/config.yml 로 복사
+#   6. <TUNNEL_ID>를 실제 터널 ID로 교체
+#
+# 실행:
+#   cloudflared tunnel run d2trader-api
+#
+# ============================================================
+
+tunnel: <TUNNEL_ID>
+credentials-file: /home/<USER>/.cloudflared/<TUNNEL_ID>.json
+
+ingress:
+  # Python API (FastAPI) — 로컬 8000번 포트
+  - hostname: api.d2trader.your-domain.com
+    service: http://localhost:8000
+    originRequest:
+      noTLSVerify: true
+
+  # 그 외 요청은 404
+  - service: http_status:404

@@ -589,21 +589,80 @@
 > **의존성**: Phase 1~8 모두 완료.
 
 ```
-□ Cloudflare Tunnel 설정
-  □ cloudflared 설치 및 로그인
-  □ 터널 생성 (d2trader-api)
-  □ DNS 레코드 (api.d2trader.your-domain.com)
-  □ config.yml 작성
+■ 배포 인프라 코드 작성
+  ■ .env.example / web/.env.example 환경변수 템플릿
+  ■ next.config.ts 프로덕션 설정 (standalone 출력)
+  ■ pyapi/main.py CORS 프로덕션 대응 (ALLOWED_ORIGINS 환경변수)
+  ■ deploy/cloudflared/config.yml 터널 설정 템플릿
+  ■ deploy/systemd/ 서비스 파일 (pyapi, tunnel)
+  ■ deploy/deploy.sh 배포 스크립트 (setup/build/start/stop/status/logs)
+  ■ .github/workflows/deploy.yml CI/CD 파이프라인
+  ■ .gitignore 업데이트
 
-□ Cloudflare Pages 배포
+□ Cloudflare Tunnel 설정 (수동 — 서버에서 실행)
+  □ cloudflared 설치 및 로그인
+  □ 터널 생성: cloudflared tunnel create d2trader-api
+  □ DNS 레코드: cloudflared tunnel route dns d2trader-api api.d2trader.your-domain.com
+  □ deploy/cloudflared/config.yml → ~/.cloudflared/config.yml 복사 후 TUNNEL_ID 교체
+
+□ Cloudflare Pages 배포 (수동 — GitHub/Cloudflare 대시보드)
   □ GitHub 연동 (TB_v2 레포)
   □ 빌드 설정: cd web && npm run build
   □ 환경변수: PYTHON_API_URL, PYTHON_API_SECRET
+  □ 또는 GitHub Actions로 자동 배포 (.github/workflows/deploy.yml)
 
 □ 배포 후 확인
   □ HTTPS 접속 확인
   □ 모바일 접속 테스트
   □ Python API ↔ Next.js 통신 확인
+```
+
+### 배포 파일 구조
+
+```
+deploy/
+├── cloudflared/
+│   └── config.yml           # Cloudflare Tunnel 설정 템플릿
+├── systemd/
+│   ├── d2trader-pyapi.service   # Python API systemd 서비스
+│   └── d2trader-tunnel.service  # Cloudflare Tunnel systemd 서비스
+└── deploy.sh                # 배포 관리 스크립트
+
+.github/workflows/
+└── deploy.yml               # Cloudflare Pages 자동 배포
+
+.env.example                 # 루트 환경변수 템플릿
+web/.env.example             # Next.js 환경변수 템플릿
+```
+
+### 배포 절차 요약
+
+```bash
+# 1. 초기 설정
+./deploy/deploy.sh setup
+
+# 2. 환경변수 편집
+vi .env                  # KIS API 키, PYTHON_API_SECRET
+vi web/.env.local        # PYTHON_API_URL, PYTHON_API_SECRET
+
+# 3. Cloudflare Tunnel 설정
+cloudflared tunnel login
+cloudflared tunnel create d2trader-api
+cloudflared tunnel route dns d2trader-api api.d2trader.your-domain.com
+cp deploy/cloudflared/config.yml ~/.cloudflared/config.yml
+# config.yml 내 <TUNNEL_ID>, <USER> 교체
+
+# 4. systemd 서비스 등록
+sudo cp deploy/systemd/*.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable d2trader-pyapi d2trader-tunnel
+
+# 5. 빌드 & 시작
+./deploy/deploy.sh build
+./deploy/deploy.sh start
+
+# 6. 상태 확인
+./deploy/deploy.sh status
 ```
 
 **Phase 9 완료 기준**: 외부 URL로 D2trader 대시보드에 접속 가능하고, 모든 기능이 정상 동작.
@@ -655,3 +714,4 @@ Phase 1 (Python API) ───────────────────�
 | 날짜 | 내용 |
 |------|------|
 | 2026-02-18 | 초안 작성 — Phase 0 완료 상태 기준, 9단계 구현 플랜 |
+| 2026-02-18 | Phase 9 구현 — 배포 인프라 코드 (CF Tunnel, systemd, CI/CD, deploy.sh) |

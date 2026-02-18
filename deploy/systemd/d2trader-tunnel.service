@@ -1,0 +1,28 @@
+# ============================================================
+# D2trader Cloudflare Tunnel — systemd 서비스 파일
+# ============================================================
+#
+# 설치:
+#   sudo cp d2trader-tunnel.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable d2trader-tunnel
+#   sudo systemctl start d2trader-tunnel
+#
+# 로그 확인:
+#   sudo journalctl -u d2trader-tunnel -f
+#
+# ============================================================
+
+[Unit]
+Description=D2trader Cloudflare Tunnel
+After=network.target d2trader-pyapi.service
+
+[Service]
+Type=simple
+User=<USER>
+ExecStart=/usr/local/bin/cloudflared tunnel run d2trader-api
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
