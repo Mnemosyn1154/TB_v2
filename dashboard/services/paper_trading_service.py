@@ -296,7 +296,7 @@ def execute_signal(session_id: str, signal_dict: dict) -> dict:
             _update_session_cash(session_id, trade_value)
 
         # 모의 거래 이력 DB 기록
-        _save_paper_trade(session_id, signal)
+        _save_paper_trade(session_id, signal, price=exec_price, quantity=exec_qty)
 
         mode = "모의투자" if not broker.live_trading else "실거래"
         return {
@@ -304,6 +304,8 @@ def execute_signal(session_id: str, signal_dict: dict) -> dict:
             "side": signal.signal.value,
             "code": signal.code,
             "market": signal.market,
+            "quantity": exec_qty,
+            "price": exec_price,
             "reason": signal.reason,
             "mode": mode,
         }
@@ -342,7 +344,13 @@ def _update_session_cash(session_id: str, delta: float) -> None:
         """), {"sid": session_id, "delta": delta})
 
 
-def _save_paper_trade(session_id: str, signal: TradeSignal) -> None:
+def _save_paper_trade(
+    session_id: str,
+    signal: TradeSignal,
+    *,
+    price: float = 0.0,
+    quantity: int = 0,
+) -> None:
     """모의 거래 이력 DB 저장"""
     engine = _get_db_engine()
     with engine.begin() as conn:
@@ -356,8 +364,8 @@ def _save_paper_trade(session_id: str, signal: TradeSignal) -> None:
             "code": signal.code,
             "market": signal.market,
             "side": signal.signal.value,
-            "qty": signal.quantity,
-            "price": signal.price,
+            "qty": quantity or signal.quantity,
+            "price": price or signal.price,
             "reason": signal.reason,
             "ts": datetime.now().isoformat(),
         })
