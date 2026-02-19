@@ -1,8 +1,6 @@
-/** 통화 포맷 (KRW) */
+/** 통화 포맷 (KRW) — 원화 기호 없이 숫자만 */
 export function formatKRW(value: number): string {
   return new Intl.NumberFormat("ko-KR", {
-    style: "currency",
-    currency: "KRW",
     maximumFractionDigits: 0,
   }).format(value);
 }
