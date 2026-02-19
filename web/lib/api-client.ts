@@ -127,6 +127,14 @@ export const toggleKillSwitch = (action: "activate" | "deactivate") =>
     body: JSON.stringify({ action }),
   });
 export const getBotStatus = () => fetchApi("/bot/status");
+export const checkKisHealth = () => fetchApi("/bot/health");
+export const getTradingMode = () => fetchApi("/bot/mode");
+export const setTradingMode = (mode: string, confirm = false) =>
+  fetchApi("/bot/mode", {
+    method: "POST",
+    body: JSON.stringify({ mode, confirm }),
+  });
+export const getOrders = (limit = 50) => fetchApi(`/bot/orders?limit=${limit}`);
 export const toggleScheduler = (action: "start" | "stop") =>
   fetchApi(`/bot/scheduler`, {
     method: "POST",

@@ -1,4 +1,4 @@
-export type TradingMode = "paper" | "live";
+export type TradingMode = "simulation" | "paper" | "live";
 
 export interface KillSwitchStatus {
   kill_switch: boolean;
@@ -39,6 +39,7 @@ export interface SchedulerStatus {
 export interface FullBotStatus {
   kill_switch: boolean;
   scheduler: SchedulerStatus;
+  mode: TradingMode;
 }
 
 export interface LogEntry {

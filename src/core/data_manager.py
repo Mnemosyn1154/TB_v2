@@ -79,6 +79,21 @@ class DataManager:
                     reason TEXT
                 )
             """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS orders (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    order_no TEXT,
+                    strategy TEXT NOT NULL,
+                    code TEXT NOT NULL,
+                    market TEXT NOT NULL,
+                    side TEXT NOT NULL,
+                    quantity INTEGER NOT NULL,
+                    price REAL NOT NULL,
+                    status TEXT DEFAULT 'placed',
+                    response_json TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
             conn.commit()
 
     # ──────────────────────────────────────────────
@@ -227,3 +242,41 @@ class DataManager:
                 "reason": reason,
             })
             conn.commit()
+
+    # ──────────────────────────────────────────────
+    # 주문 추적
+    # ──────────────────────────────────────────────
+
+    def save_order(self, order_no: str, strategy: str, code: str,
+                   market: str, side: str, quantity: int, price: float,
+                   response_json: str = "") -> None:
+        """KIS 주문 결과 저장"""
+        with self.engine.connect() as conn:
+            conn.execute(text("""
+                INSERT INTO orders (order_no, strategy, code, market, side,
+                                    quantity, price, status, response_json)
+                VALUES (:order_no, :strategy, :code, :market, :side,
+                        :quantity, :price, 'placed', :response_json)
+            """), {
+                "order_no": order_no,
+                "strategy": strategy,
+                "code": code,
+                "market": market,
+                "side": side,
+                "quantity": quantity,
+                "price": price,
+                "response_json": response_json,
+            })
+            conn.commit()
+
+    def get_orders(self, limit: int = 50) -> list[dict]:
+        """최근 주문 내역 조회"""
+        with self.engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT id, order_no, strategy, code, market, side,
+                       quantity, price, status, created_at
+                FROM orders
+                ORDER BY created_at DESC
+                LIMIT :limit
+            """), {"limit": limit})
+            return [dict(row._mapping) for row in result]

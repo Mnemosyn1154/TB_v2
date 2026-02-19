@@ -3,11 +3,11 @@
 import { useState, useCallback, useEffect } from "react";
 import { getBotStatus } from "@/lib/api-client";
 import type { ApiResponse } from "@/types/common";
-import type { FullBotStatus, SchedulerStatus } from "@/types/control";
+import type { FullBotStatus, SchedulerStatus, TradingMode } from "@/types/control";
 
 interface BotStatusResult {
   kill_switch: boolean;
-  mode: "live" | "paper" | "idle";
+  mode: TradingMode;
   scheduler: SchedulerStatus | null;
 }
 
@@ -20,7 +20,7 @@ export function useBotStatus() {
       if (res.data) {
         setStatus({
           kill_switch: res.data.kill_switch,
-          mode: "idle",
+          mode: res.data.mode ?? "simulation",
           scheduler: res.data.scheduler,
         });
       }

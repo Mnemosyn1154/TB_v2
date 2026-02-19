@@ -195,6 +195,39 @@ class RiskManager:
             return True
         return False
 
+    def check_portfolio_risk(self) -> tuple[bool, str]:
+        """포트폴리오 레벨 리스크 체크. 한도 초과 시 킬스위치 자동 발동.
+
+        Returns:
+            (is_safe, reason) — is_safe=False이면 킬스위치 활성화됨
+        """
+        if self.backtest_mode:
+            return True, "OK"
+
+        if self._kill_switch:
+            return False, "Kill switch 이미 활성화됨"
+
+        total = self.state.total_equity + self.state.cash
+        if total <= 0:
+            return True, "OK"
+
+        # 일일 손실 한도 체크
+        daily_pnl_pct = (self.state.daily_pnl / total) * 100
+        if daily_pnl_pct <= self.daily_loss_limit_pct:
+            reason = (f"일일 손실 한도 초과: {daily_pnl_pct:.1f}% <= "
+                      f"{self.daily_loss_limit_pct}% — 킬스위치 자동 발동")
+            self.activate_kill_switch(reason)
+            return False, reason
+
+        # MDD 체크
+        if self.state.drawdown_pct <= self.max_drawdown_pct:
+            reason = (f"최대 드로다운 초과: {self.state.drawdown_pct:.1f}% <= "
+                      f"{self.max_drawdown_pct}% — 킬스위치 자동 발동")
+            self.activate_kill_switch(reason)
+            return False, reason
+
+        return True, "OK"
+
     # ──────────────────────────────────────────────
     # 포지션 관리
     # ──────────────────────────────────────────────
