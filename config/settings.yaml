@@ -72,7 +72,7 @@ strategies:
       quality: 0.3
       momentum: 0.4
     absolute_momentum_filter: true
-    abs_mom_threshold: 0.0
+    abs_mom_threshold: 0
     safe_asset: SHY
     safe_asset_exchange: NYS
     universe_codes:
@@ -273,8 +273,8 @@ strategies:
         market: KR
         name: 은행
   volatility_breakout:
-    enabled: false
-    k: 0.5
+    enabled: true
+    k: 0.8
     market: KR
     max_hold_per_stock: 1
     close_at_market_end: true
@@ -304,10 +304,10 @@ risk:
   max_positions: 10
   min_cash_pct: 20
   strategy_allocation:
-    stat_arb: 0.30
-    dual_momentum: 0.20
-    quant_factor: 0.40
-    sector_rotation: 0.10
+    stat_arb: 0.3
+    dual_momentum: 0.2
+    quant_factor: 0.4
+    sector_rotation: 0.1
 notifications:
   telegram:
     enabled: true

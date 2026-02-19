@@ -113,8 +113,8 @@ class BacktestEngine:
         self.equity_history: list[dict] = []
         self.trades: list[Trade] = []
 
-        # 리스크 매니저 (시뮬레이션용 인스턴스)
-        self.risk_manager = RiskManager()
+        # 리스크 매니저 (백테스트 모드: 킬스위치/MDD/일일손실 체크 비활성화)
+        self.risk_manager = RiskManager(backtest_mode=True)
         self.risk_manager.state.total_equity = initial_capital
         self.risk_manager.state.cash = initial_capital
         self.risk_manager.state.peak_equity = initial_capital
