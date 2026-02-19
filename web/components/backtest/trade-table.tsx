@@ -152,7 +152,7 @@ export function TradeTable({ trades }: TradeTableProps) {
                       )}
                     >
                       {t.pnl_pct != null
-                        ? formatPercent(t.pnl_pct * 100)
+                        ? formatPercent(t.pnl_pct)
                         : "-"}
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs">
