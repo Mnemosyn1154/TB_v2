@@ -43,4 +43,5 @@ export interface PortfolioData {
   risk: RiskSummary;
   strategies?: StrategyStatus[];
   initial_capital?: number;
+  exchange_rate?: number;
 }

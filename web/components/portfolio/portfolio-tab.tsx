@@ -73,7 +73,7 @@ export function PortfolioTab() {
         <h3 className="mb-3 text-sm font-semibold text-muted-foreground">
           보유 종목
         </h3>
-        <HoldingsTable kr={data.kr} us={data.us} />
+        <HoldingsTable kr={data.kr} us={data.us} exchangeRate={data.exchange_rate} />
       </section>
 
       <RiskIndicators risk={data.risk} />

@@ -18,9 +18,12 @@ import type { Position, MarketBalance } from "@/types/portfolio";
 interface HoldingsTableProps {
   kr: MarketBalance;
   us: MarketBalance;
+  exchangeRate?: number;
 }
 
-function fmt(p: Position) {
+const DEFAULT_FX = 1350;
+
+function fmtPrice(p: Position) {
   return p.market === "KR" ? formatKRW : formatUSD;
 }
 
@@ -36,13 +39,18 @@ function groupByStrategy(positions: Position[]): Map<string, Position[]> {
   return map;
 }
 
-/** Strategy-level totals */
-function strategySummary(positions: Position[]) {
+/** Convert amount to KRW */
+function toKRW(amount: number, market: string, fx: number): number {
+  return market === "US" ? amount * fx : amount;
+}
+
+/** Strategy-level totals in KRW */
+function strategySummary(positions: Position[], fx: number) {
   let totalCost = 0;
   let totalValue = 0;
   for (const p of positions) {
-    totalCost += p.avg_price * p.quantity;
-    totalValue += p.current_price * p.quantity;
+    totalCost += toKRW(p.avg_price * p.quantity, p.market, fx);
+    totalValue += toKRW(p.current_price * p.quantity, p.market, fx);
   }
   const pnl = totalValue - totalCost;
   const pnlPct = totalCost > 0 ? (pnl / totalCost) * 100 : 0;
@@ -52,11 +60,13 @@ function strategySummary(positions: Position[]) {
 function StrategyCard({
   strategy,
   positions,
+  fx,
 }: {
   strategy: string;
   positions: Position[];
+  fx: number;
 }) {
-  const summary = strategySummary(positions);
+  const summary = strategySummary(positions, fx);
 
   return (
     <Card>
@@ -107,9 +117,10 @@ function StrategyCard({
             </TableHeader>
             <TableBody>
               {positions.map((p) => {
-                const formatPrice = fmt(p);
+                const formatP = fmtPrice(p);
                 const investedAmt = p.avg_price * p.quantity;
                 const currentAmt = p.current_price * p.quantity;
+                const isUS = p.market === "US";
                 return (
                   <TableRow key={p.code}>
                     <TableCell>
@@ -132,15 +143,25 @@ function StrategyCard({
                       {formatNumber(p.quantity)}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      <div>{formatPrice(investedAmt)}</div>
+                      <div>{formatP(investedAmt)}</div>
+                      {isUS && (
+                        <div className="text-xs text-muted-foreground">
+                          {formatKRW(investedAmt * fx)}
+                        </div>
+                      )}
                       <div className="text-xs text-muted-foreground">
-                        @{formatPrice(p.avg_price)}
+                        @{formatP(p.avg_price)}
                       </div>
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      <div>{formatPrice(currentAmt)}</div>
+                      <div>{formatP(currentAmt)}</div>
+                      {isUS && (
+                        <div className="text-xs text-muted-foreground">
+                          {formatKRW(currentAmt * fx)}
+                        </div>
+                      )}
                       <div className="text-xs text-muted-foreground">
-                        @{formatPrice(p.current_price)}
+                        @{formatP(p.current_price)}
                       </div>
                     </TableCell>
                     <TableCell
@@ -159,7 +180,12 @@ function StrategyCard({
                         p.profit_amt < 0 && "text-destructive"
                       )}
                     >
-                      {fmt(p)(p.profit_amt)}
+                      <div>{fmtPrice(p)(p.profit_amt)}</div>
+                      {isUS && (
+                        <div className="text-xs text-muted-foreground">
+                          {formatKRW(p.profit_amt * fx)}
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 );
@@ -172,7 +198,8 @@ function StrategyCard({
   );
 }
 
-export function HoldingsTable({ kr, us }: HoldingsTableProps) {
+export function HoldingsTable({ kr, us, exchangeRate }: HoldingsTableProps) {
+  const fx = exchangeRate || DEFAULT_FX;
   const allPositions = [...kr.positions, ...us.positions];
 
   if (allPositions.length === 0) {
@@ -187,8 +214,18 @@ export function HoldingsTable({ kr, us }: HoldingsTableProps) {
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex justify-end">
+        <span className="text-xs text-muted-foreground font-mono">
+          USD/KRW {formatKRW(fx)}
+        </span>
+      </div>
       {Array.from(grouped.entries()).map(([strategy, items]) => (
-        <StrategyCard key={strategy} strategy={strategy} positions={items} />
+        <StrategyCard
+          key={strategy}
+          strategy={strategy}
+          positions={items}
+          fx={fx}
+        />
       ))}
     </div>
   );

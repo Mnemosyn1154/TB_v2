@@ -81,6 +81,7 @@ def _get_simulation_portfolio() -> dict:
         },
         "risk": risk_mgr.get_risk_summary(),
         "initial_capital": summary["initial_capital"],
+        "exchange_rate": get_usd_krw(),
         "error": None,
     }
 
@@ -139,8 +140,39 @@ def _get_kis_portfolio() -> dict:
         "kr": kr_balance,
         "us": us_balance,
         "risk": risk_mgr.get_risk_summary(),
+        "exchange_rate": get_usd_krw(),
         "error": None,
     }
+
+
+# ──────────────────────────────────────────────
+# 환율
+# ──────────────────────────────────────────────
+
+_fx_cache: dict[str, tuple[float, float]] = {}  # pair → (rate, timestamp)
+_FX_TTL = 3600  # 1시간 캐시
+
+
+def get_usd_krw() -> float:
+    """USD/KRW 환율 조회 (yfinance, 1시간 캐시)"""
+    import time
+    cached = _fx_cache.get("USDKRW")
+    if cached and (time.time() - cached[1]) < _FX_TTL:
+        return cached[0]
+    try:
+        import yfinance as yf
+        ticker = yf.Ticker("USDKRW=X")
+        rate = ticker.fast_info.get("lastPrice", 0) or 0
+        if rate > 0:
+            _fx_cache["USDKRW"] = (rate, time.time())
+            logger.debug(f"USD/KRW 환율: {rate:,.1f}")
+            return rate
+    except Exception as e:
+        logger.warning(f"USD/KRW 환율 조회 실패: {e}")
+    # 캐시 남아있으면 만료돼도 사용
+    if cached:
+        return cached[0]
+    return 1350.0  # 최후 폴백
 
 
 # ──────────────────────────────────────────────
