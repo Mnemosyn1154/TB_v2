@@ -136,6 +136,8 @@ class RiskManager:
     def can_open_position(self, code: str, market_value: float,
                           strategy: str = "") -> tuple[bool, str]:
         """새 포지션 오픈 가능 여부 검증"""
+        total = self.state.total_equity + self.state.cash
+
         # 백테스트 모드: 킬스위치/일일손실/MDD 체크 건너뜀
         if not self.backtest_mode:
             # Kill switch 체크
@@ -143,7 +145,6 @@ class RiskManager:
                 return False, "🚨 Kill switch 활성화됨 — 모든 거래 중단"
 
             # 일일 손실 한도
-            total = self.state.total_equity + self.state.cash
             if total > 0:
                 daily_pnl_pct = (self.state.daily_pnl / total) * 100
                 if daily_pnl_pct <= self.daily_loss_limit_pct:
