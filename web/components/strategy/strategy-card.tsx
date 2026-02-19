@@ -22,7 +22,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ChevronDown, ChevronUp, Trash2, Plus, Pencil } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  GripVertical,
+  Trash2,
+  Plus,
+  Pencil,
+} from "lucide-react";
+import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { cn } from "@/lib/utils";
 import {
   snakeToTitle,
@@ -60,12 +68,13 @@ const EMPTY_PAIR: Pair = {
 
 const EMPTY_CODE: UniverseCode = { code: "", market: "KR", name: "" };
 
-interface StrategyCardProps {
+export interface StrategyCardProps {
   strategyKey: string;
   config: Record<string, unknown>;
   onToggle: (key: string) => void;
   onSave: (key: string, updated: Record<string, unknown>) => void;
   onDelete: (key: string) => void;
+  dragListeners?: SyntheticListenerMap;
 }
 
 export function StrategyCard({
@@ -74,6 +83,7 @@ export function StrategyCard({
   onToggle,
   onSave,
   onDelete,
+  dragListeners,
 }: StrategyCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -634,51 +644,67 @@ export function StrategyCard({
 
   return (
     <>
-      <Card
-        className={cn("gap-0 py-0 overflow-hidden", !enabled && "opacity-60")}
-      >
-        {/* Header — always visible, click to expand/collapse */}
-        <div
-          className="flex items-center justify-between px-6 py-4 cursor-pointer select-none"
-          onClick={toggleExpand}
+      <div className="flex items-stretch gap-2">
+        {/* Drag handle — vertically centered beside card */}
+        <button
+          type="button"
+          className="flex items-center cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing px-0.5"
+          {...dragListeners}
         >
-          <div className="flex items-center gap-3">
-            {expanded ? (
-              <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
-            ) : (
-              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-            )}
-            <span className="font-semibold">{snakeToTitle(strategyKey)}</span>
-            <Badge variant={enabled ? "default" : "secondary"}>
-              {enabled ? "ON" : "OFF"}
-            </Badge>
-            {typeName && (
-              <Badge variant="outline" className="text-xs">
-                {typeName}
+          <GripVertical className="h-5 w-5 shrink-0" />
+        </button>
+
+        <Card
+          className={cn(
+            "flex-1 gap-0 py-0 overflow-hidden",
+            !enabled && "opacity-60"
+          )}
+        >
+          {/* Header — always visible, click to expand/collapse */}
+          <div
+            className="flex items-center justify-between px-6 py-4 cursor-pointer select-none"
+            onClick={toggleExpand}
+          >
+            <div className="flex items-center gap-3">
+              {expanded ? (
+                <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+              )}
+              <span className="font-semibold">
+                {snakeToTitle(strategyKey)}
+              </span>
+              <Badge variant={enabled ? "default" : "secondary"}>
+                {enabled ? "ON" : "OFF"}
               </Badge>
-            )}
+              {typeName && (
+                <Badge variant="outline" className="text-xs">
+                  {typeName}
+                </Badge>
+              )}
+            </div>
+            <Switch
+              checked={enabled}
+              onClick={(e) => e.stopPropagation()}
+              onCheckedChange={() => onToggle(strategyKey)}
+            />
           </div>
-          <Switch
-            checked={enabled}
-            onClick={(e) => e.stopPropagation()}
-            onCheckedChange={() => onToggle(strategyKey)}
-          />
-        </div>
 
-        {/* Collapsed summary */}
-        {!expanded && (
-          <div className="px-6 pb-4 -mt-1">
-            <p className="text-sm text-muted-foreground">
-              {[summarizeConfig(config), universeSummary()]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
-          </div>
-        )}
+          {/* Collapsed summary */}
+          {!expanded && (
+            <div className="px-6 pb-4 -mt-1">
+              <p className="text-sm text-muted-foreground">
+                {[summarizeConfig(config), universeSummary()]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            </div>
+          )}
 
-        {/* Expanded — read-only or editing */}
-        {expanded && (editing ? <EditView /> : <ReadOnlyView />)}
-      </Card>
+          {/* Expanded — read-only or editing */}
+          {expanded && (editing ? <EditView /> : <ReadOnlyView />)}
+        </Card>
+      </div>
 
       {/* Delete confirmation dialog */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>

@@ -1,10 +1,26 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo, useState } from "react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { useApi } from "@/hooks/use-api";
 import { getSettings, updateSettings } from "@/lib/api-client";
-import { StrategyCard } from "./strategy-card";
+import { SortableStrategyCard } from "./sortable-strategy-card";
 import { StrategyCreateDialog } from "./strategy-create-dialog";
 import type { ApiResponse } from "@/types/common";
 
@@ -19,6 +35,47 @@ export function StrategyTab() {
     []
   );
   const { data, error, loading, refetch } = useApi<SettingsData>(fetcher);
+
+  // Local ordering override — null means use server order
+  const [localOrder, setLocalOrder] = useState<string[] | null>(null);
+
+  const strategyKeys = useMemo(() => {
+    if (!data) return [];
+    const serverKeys = Object.keys(data.strategies);
+    if (localOrder) {
+      // Keep localOrder but filter out deleted keys, append new ones
+      const existing = new Set(serverKeys);
+      const ordered = localOrder.filter((k) => existing.has(k));
+      const appended = serverKeys.filter((k) => !localOrder.includes(k));
+      return [...ordered, ...appended];
+    }
+    return serverKeys;
+  }, [data, localOrder]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !data) return;
+
+    const oldIndex = strategyKeys.indexOf(active.id as string);
+    const newIndex = strategyKeys.indexOf(over.id as string);
+    const newOrder = arrayMove(strategyKeys, oldIndex, newIndex);
+    setLocalOrder(newOrder);
+
+    // Rebuild strategies object in new order
+    const reordered: Record<string, Record<string, unknown>> = {};
+    for (const key of newOrder) {
+      reordered[key] = data.strategies[key];
+    }
+    await updateSettings({ ...data, strategies: reordered });
+    refetch();
+  }
 
   async function handleToggle(key: string) {
     try {
@@ -44,6 +101,7 @@ export function StrategyTab() {
   async function handleDelete(key: string) {
     try {
       await fetch(`/api/settings/strategies/${key}`, { method: "DELETE" });
+      setLocalOrder((prev) => prev?.filter((k) => k !== key) ?? null);
       refetch();
     } catch {
       // silently fail, refetch will show current state
@@ -73,18 +131,30 @@ export function StrategyTab() {
         <StrategyCreateDialog onCreated={refetch} />
       </div>
 
-      <div className="flex flex-col gap-4">
-        {Object.entries(strategies).map(([key, config]) => (
-          <StrategyCard
-            key={key}
-            strategyKey={key}
-            config={config}
-            onToggle={handleToggle}
-            onSave={handleSave}
-            onDelete={handleDelete}
-          />
-        ))}
-      </div>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        modifiers={[restrictToVerticalAxis]}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={strategyKeys}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="flex flex-col gap-4">
+            {strategyKeys.map((key) => (
+              <SortableStrategyCard
+                key={key}
+                strategyKey={key}
+                config={strategies[key]}
+                onToggle={handleToggle}
+                onSave={handleSave}
+                onDelete={handleDelete}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
     </div>
   );
 }
