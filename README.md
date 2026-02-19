@@ -23,13 +23,14 @@
 
 ## 전략
 
-| 전략 | 설명 | 방식 |
-|------|------|------|
-| **stat_arb** | 통계적 차익거래 | 공적분 기반 페어 트레이딩 (z-score 진입/청산) |
-| **dual_momentum** | 듀얼 모멘텀 | 상대 모멘텀 + 절대 모멘텀, 월 1회 리밸런싱 |
-| **quant_factor** | 퀀트 팩터 | 멀티팩터 스코어링 (가치+퀄리티+모멘텀) + 절대 모멘텀 필터 |
-| **sector_rotation** | 섹터 로테이션 | US/KR 섹터 ETF 모멘텀 기반 상위 N개 투자 |
-| **volatility_breakout** | 변동성 돌파 | 래리 윌리엄스 방식, OHLC 기반 일중 전략 |
+| 전략 | 설명 | 방식 | 상태 |
+|------|------|------|------|
+| **dual_momentum** | 듀얼 모멘텀 | 상대 모멘텀 + 절대 모멘텀, 월 1회 리밸런싱 | 활성 |
+| **quant_factor** | 퀀트 팩터 | 멀티팩터 스코어링 (가치+퀄리티+모멘텀) + 절대 모멘텀 필터 | 활성 |
+| **volatility_breakout** | 변동성 돌파 | 래리 윌리엄스 방식, OHLC 기반 일중 전략 | 활성 |
+| **bollinger_band** | 볼린저 밴드 | SMA ± K×σ 평균 회귀, 과매도 매수/과매수 청산 | 활성 |
+| **stat_arb** | 통계적 차익거래 | 공적분 기반 페어 트레이딩 (z-score 진입/청산) | 비활성 |
+| **sector_rotation** | 섹터 로테이션 | US/KR 섹터 ETF 모멘텀 기반 상위 N개 투자 | 비활성 |
 
 ## Quick Start
 
@@ -59,16 +60,16 @@ TB_v2/
 ├── config/settings.yaml     # 전략/리스크/브로커 설정
 ├── src/                     # Python 코어 엔진
 │   ├── core/                # 브로커, 설정, DB, 리스크 관리
-│   ├── strategies/          # 5개 매매 전략 (BaseStrategy 플러그인)
+│   ├── strategies/          # 6개 매매 전략 (BaseStrategy 플러그인)
 │   ├── execution/           # 데이터 수집 + 주문 실행
 │   ├── backtest/            # 백테스트 엔진
 │   └── utils/               # 로거(loguru), 텔레그램 알림
 ├── pyapi/                   # FastAPI 서버 (6개 라우터)
 │   └── routers/             # portfolio, backtest, bot, signals, paper, benchmark
 ├── web/                     # Next.js 16 프론트엔드 (6탭 SPA)
-├── tests/                   # pytest (85 tests)
+├── tests/                   # pytest (94 tests)
 ├── dashboard/               # Streamlit 레거시 UI (deprecated)
-├── deploy/                  # 배포 (systemd, Cloudflare, GitHub Actions)
+├── deploy/                  # 배포 (systemd/launchd, Cloudflare, GitHub Actions)
 └── docs/                    # 문서
 ```
 
@@ -82,26 +83,28 @@ python3 main.py backtest --strategy stat_arb     # DB 기반 백테스트
 python3 main.py backtest-yf -s stat_arb --start 2020-01-01 --end 2024-12-31
 python3 main.py backtest-yf -s all --start 2020-01-01 --end 2024-12-31 --capital 50000000
 python3 main.py backtest-yf -s stat_arb --per-pair --start 2020-01-01 --end 2024-12-31
+python3 main.py backtest-yf -s bollinger_band --start 2020-01-01 --end 2024-12-31
 ```
 
 ## 기술 스택
 
-**백엔드**: Python 3.12 (pyenv), FastAPI, SQLAlchemy, pandas, numpy, scipy, statsmodels, yfinance, APScheduler
-**프론트엔드**: Next.js 16, React 19, TypeScript 5.9, Tailwind CSS 4, shadcn/ui, Recharts
+**백엔드**: Python 3.12 (pyenv), FastAPI, SQLAlchemy, pandas, numpy, scipy, scikit-learn, statsmodels, yfinance, APScheduler
+**프론트엔드**: Next.js 16.1, React 19.2, TypeScript 5.9, Tailwind CSS 4, shadcn/ui, Recharts
 **DB**: SQLite
-**배포**: Cloudflare Pages + Tunnel, systemd, GitHub Actions
+**배포**: Cloudflare Pages + Tunnel, systemd/launchd, GitHub Actions
 
 ## 테스트
 
 ```bash
-python -m pytest tests/             # 전체 85 tests
+python -m pytest tests/             # 전체 94 tests
 python -m pytest tests/ -v          # verbose
 ```
 
 | 파일 | 테스트 수 | 대상 |
 |------|----------|------|
 | `test_simulation_e2e.py` | 13 | PortfolioTracker E2E (매수/매도/P&L/스냅샷) |
-| `test_strategies.py` | 72 | StatArb/DualMomentum/QuantFactor/AbsMomentum/SectorRotation/VolatilityBreakout |
+| `test_strategies.py` | 71 | StatArb/DualMomentum/QuantFactor/AbsMomentum/SectorRotation/VolatilityBreakout/BollingerBand |
+| `test_risk_manager.py` | 10 | RiskManager 자본 배분 및 리스크 검증 |
 
 ## 문서
 
@@ -116,3 +119,5 @@ python -m pytest tests/ -v          # verbose
 | [USER_MANUAL.md](docs/USER_MANUAL.md) | 사용자 매뉴얼 |
 | [TEST_PLAN.md](docs/TEST_PLAN.md) | 테스트 전략 및 케이스 |
 | [SIMULATION_ISSUES.md](docs/SIMULATION_ISSUES.md) | 시뮬레이션 이슈 분석 & 수정 이력 |
+| [REFACTORING_ANALYSIS.md](docs/REFACTORING_ANALYSIS.md) | 리팩토링 분석 |
+| [UI_FEATURE_PLAN.md](docs/UI_FEATURE_PLAN.md) | UI 기능 플랜 |

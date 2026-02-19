@@ -43,7 +43,7 @@
 - APScheduler 15분 주기 자동 실행 (장중에만 실행, 킬스위치 연동)
   - 대시보드에서 스케줄러 on/off 토글, 다음 실행/마지막 실행 상태 표시
 - 전략 카드 드래그 앤 드롭 순서 변경
-- 테스트: 94 tests (시뮬레이션 E2E 13개 + 전략 유닛 81개)
+- 테스트: 94 tests (시뮬레이션 E2E 13개 + 전략 유닛 71개 + 리스크매니저 10개)
 - 다크 모드 (기본값)
 - Cloudflare Pages + Tunnel 배포 파이프라인
 - macOS launchd 배포 지원 (deploy/launchd/)

@@ -198,7 +198,8 @@ python3 main.py backtest-yf -s stat_arb --start 2020-01-01 --end 2024-12-31
 - **백테스트 리스크**: 백테스트 모드에서 MDD/킬스위치/일일손실 체크 자동 비활성화
 - **테스트**: 94 tests 통과 (`python -m pytest tests/`)
   - `tests/test_simulation_e2e.py` — PortfolioTracker E2E (13 tests)
-  - `tests/test_strategies.py` — StatArb/DualMomentum/QuantFactor/AbsMomentum/SectorRotation/VolatilityBreakout/BollingerBand 유닛 (81 tests)
+  - `tests/test_strategies.py` — StatArb/DualMomentum/QuantFactor/AbsMomentum/SectorRotation/VolatilityBreakout/BollingerBand 유닛 (71 tests)
+  - `tests/test_risk_manager.py` — RiskManager 자본 배분 및 리스크 검증 (10 tests)
 - **KIS 실전 거래 연동**: 모드 전환, KIS 상태 조회, 주문 내역 API 구현
 - **전략 카드 드래그 앤 드롭**: @dnd-kit 기반 순서 변경
 - **Settings API**: Python API 없이 Next.js에서 settings.yaml 직접 읽기/쓰기
