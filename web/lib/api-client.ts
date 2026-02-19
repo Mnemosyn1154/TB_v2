@@ -100,6 +100,15 @@ export const runBacktestPerPair = (params: unknown) =>
   });
 export const getBacktestPairs = (strategy: string) =>
   fetchApi(`/backtest/pairs/${strategy}`);
+export const getBacktestPeerComparison = (params: {
+  start_date: string;
+  end_date: string;
+  equity_curve: { dates: string[]; values: number[] };
+}) =>
+  fetchApi("/backtest/peer-comparison", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
 
 // Bot
 export const runBot = () => fetchApi("/bot/run", { method: "POST" });

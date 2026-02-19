@@ -45,3 +45,21 @@ export interface BacktestResult {
   pnl_values: number[];
   logs?: string[];
 }
+
+export interface PeerMetrics {
+  total_return: number;
+  cagr: number;
+  mdd: number;
+}
+
+export interface PeerComparisonData {
+  dates: string[];
+  strategy: number[];
+  kospi: number[];
+  sp500: number[];
+  metrics: {
+    strategy: PeerMetrics;
+    kospi: PeerMetrics;
+    sp500: PeerMetrics;
+  };
+}

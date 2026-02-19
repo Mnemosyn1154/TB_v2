@@ -7,6 +7,7 @@ import type { ApiResponse } from "@/types/common";
 
 interface UseBacktestReturn {
   result: BacktestResult | null;
+  lastParams: BacktestRequest | null;
   error: string | null;
   loading: boolean;
   run: (params: BacktestRequest) => Promise<void>;
@@ -15,6 +16,7 @@ interface UseBacktestReturn {
 
 export function useBacktest(): UseBacktestReturn {
   const [result, setResult] = useState<BacktestResult | null>(null);
+  const [lastParams, setLastParams] = useState<BacktestRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -27,6 +29,7 @@ export function useBacktest(): UseBacktestReturn {
         setError(res.error);
       } else {
         setResult(res.data);
+        setLastParams(params);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error");
@@ -37,8 +40,9 @@ export function useBacktest(): UseBacktestReturn {
 
   const clear = useCallback(() => {
     setResult(null);
+    setLastParams(null);
     setError(null);
   }, []);
 
-  return { result, error, loading, run, clear };
+  return { result, lastParams, error, loading, run, clear };
 }
