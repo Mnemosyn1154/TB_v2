@@ -22,7 +22,8 @@
 **특징**:
 - 수수료 + 슬리피지 모델링
 - Look-ahead bias 방지 (현재 날짜까지만 데이터 사용)
-- RiskManager 통합 (동일한 리스크 체크 적용)
+- RiskManager 통합 — 단, 백테스트 모드에서는 MDD/킬스위치/일일손실 체크 자동 비활성화 (`backtest_mode` 플래그)
+- OHLC 전략 지원 (`needs_ohlc = True` 플래그, bisect 기반 날짜 캐시, signal.price 우선)
 - 기존 전략 코드 재사용 (`generate_signals()` 그대로 호출)
 
 **의존**: `BaseStrategy`, `RiskManager`, `config`

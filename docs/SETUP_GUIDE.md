@@ -30,7 +30,7 @@
 |-----------|----------|------------|----------|
 | **Node.js** | 18.17+ (LTS 권장) | `node -v` | [nodejs.org](https://nodejs.org/) |
 | **npm** | 9+ (Node.js와 함께 설치) | `npm -v` | Node.js에 포함 |
-| **Python** | 3.12+ | `python3 --version` | [python.org](https://python.org/) |
+| **Python** | 3.12+ (pyenv 3.12.12 권장) | `python3 --version` | [python.org](https://python.org/) 또는 pyenv |
 | **pip** | 최신 | `pip3 --version` | Python에 포함 |
 | **Git** | 2.30+ | `git --version` | [git-scm.com](https://git-scm.com/) |
 
@@ -56,7 +56,26 @@ Python:
   - Error Lens (usernamehw.errorlens) — 에러를 코드 옆에 표시
 ```
 
-### 1.4 기존 프로젝트 확인
+### 1.4 Python 버전 관리 (pyenv)
+
+프로젝트 루트에 `.python-version` 파일이 있어 pyenv 사용 시 자동으로 Python 3.12.12가 선택됩니다.
+
+```bash
+# pyenv 설치 (macOS)
+brew install pyenv
+
+# Python 3.12.12 설치
+pyenv install 3.12.12
+
+# 프로젝트 루트에서 자동 활성화 확인
+cd TB_v2
+python3 --version
+# → Python 3.12.12
+```
+
+pyenv를 사용하지 않는 경우, 시스템 Python 3.12+ 이면 됩니다.
+
+### 1.5 기존 프로젝트 확인
 
 D2trader는 기존 AlgoTrader KR의 `src/`, `config/` 코드를 재활용한다.
 셋업 전에 기존 프로젝트가 정상 동작하는지 확인:

@@ -1,5 +1,9 @@
-# DESIGN_SYSTEM.md — AlgoTrader KR 디자인 시스템
+# DESIGN_SYSTEM.md — D2trader 디자인 시스템
 
+> **상태: 히스토리 참조 전용** — Next.js 16 대시보드 구현 완료 (2026-02-19).
+> 아래 로드맵 Phase 1-5와 체크박스는 초기 계획 기준이며, 실제로는 모두 구현 완료.
+> 디자인 토큰은 `web/app/globals.css`에 적용됨. Tailwind CSS 4 + OKLCH 색상 시스템 사용.
+>
 > 대시보드 UI의 디자인 원칙, 토큰, 컴포넌트, 페이지 구성, 전환 로드맵을 정의합니다.
 > 레퍼런스: [prism-insight](https://github.com/dragon1086/prism-insight) (Next.js + Tailwind + shadcn/ui + Recharts)
 

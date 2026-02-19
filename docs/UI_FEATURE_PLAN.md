@@ -1,5 +1,8 @@
 # UI_FEATURE_PLAN.md — D2trader UI 기능 도입 계획
 
+> **상태: 히스토리 참조 전용** — 6탭 대시보드 모두 구현 완료 (2026-02-19).
+> 아래 도입 판단과 보류/불필요 분류는 초기 설계 시점 기준이며, 실제 구현과 다를 수 있음.
+>
 > prism-insight 대시보드에서 어떤 기능/패턴을 가져올지, 왜 가져오는지, 왜 안 가져오는지를 정리합니다.
 > 기술 스펙은 [`WEB_PROJECT_SPEC.md`](./WEB_PROJECT_SPEC.md), 디자인 토큰은 [`DESIGN_SYSTEM.md`](./DESIGN_SYSTEM.md) 참조.
 

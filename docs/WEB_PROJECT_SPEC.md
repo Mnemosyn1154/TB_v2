@@ -1,7 +1,10 @@
 # WEB_PROJECT_SPEC.md — D2trader 개발 스펙
 
-> 새 프로젝트 **D2trader**의 기술 스택, 아키텍처, API 설계, 구현 체크리스트를 정의합니다.
+> **상태**: 히스토리 참조 문서. 실제 구현은 Phase 0-9 모두 완료.
+> 아래 기술 스택 버전은 초기 계획 기준이며, 실제 사용 버전은 README.md 참조.
 > 디자인 토큰과 페이지 와이어프레임은 [`DESIGN_SYSTEM.md`](./DESIGN_SYSTEM.md)를 참조합니다.
+>
+> **실제 기술 스택**: Next.js 16 + React 19 + TypeScript 5.9 + Tailwind CSS 4 + Python 3.12
 
 ---
 

@@ -1,5 +1,9 @@
 # mainplan.md — D2trader 전체 구현 플랜
 
+> **상태: 히스토리 참조 전용** — Phase 0-9 모두 구현 완료 (2026-02-19).
+> 아래 "미완료" 체크박스와 상태 테이블은 초기 계획 작성 시점 기준이며, 현재 코드와 다를 수 있음.
+> 최신 상태는 [`STATUS.md`](./STATUS.md) 참조.
+>
 > 초기 세팅(Phase 0) 완료 후, 실제 기능 구현을 위한 단계별 실행 계획.
 > 각 Phase는 독립적으로 검증 가능한 단위로 구성됨.
 > 참조: [`WEB_PROJECT_SPEC.md`](./WEB_PROJECT_SPEC.md), [`DESIGN_SYSTEM.md`](./DESIGN_SYSTEM.md), [`UI_FEATURE_PLAN.md`](./UI_FEATURE_PLAN.md)
