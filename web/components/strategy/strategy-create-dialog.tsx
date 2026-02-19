@@ -26,6 +26,9 @@ const STRATEGY_TYPES = [
   { value: "stat_arb", label: "Stat Arb (통계적 차익거래)" },
   { value: "dual_momentum", label: "Dual Momentum (듀얼 모멘텀)" },
   { value: "quant_factor", label: "Quant Factor (퀀트 팩터)" },
+  { value: "sector_rotation", label: "Sector Rotation (섹터 로테이션)" },
+  { value: "volatility_breakout", label: "Volatility Breakout (변동성 돌파)" },
+  { value: "bollinger_band", label: "Bollinger Band (볼린저 밴드)" },
 ] as const;
 
 interface StrategyCreateDialogProps {

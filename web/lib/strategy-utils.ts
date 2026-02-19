@@ -32,6 +32,8 @@ const KNOWN_LABELS: Record<string, string> = {
   abs_mom_threshold: "모멘텀 임계값",
   safe_asset: "안전자산 코드",
   safe_asset_exchange: "안전자산 거래소",
+  window: "SMA 윈도우 (일)",
+  num_std: "표준편차 배수",
 };
 
 export function fieldLabel(field: string): string {
