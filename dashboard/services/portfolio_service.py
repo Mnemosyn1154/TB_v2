@@ -147,22 +147,56 @@ def _get_kis_portfolio() -> dict:
 # 헬퍼 함수
 # ──────────────────────────────────────────────
 
+def _build_name_lookup() -> dict[str, str]:
+    """settings.yaml에서 종목코드 → 이름 매핑 빌드"""
+    config = get_config()
+    lookup: dict[str, str] = {}
+    strategies = config.get("strategies", {})
+    for _key, strat in strategies.items():
+        for item in strat.get("universe_codes", []):
+            if item.get("code") and item.get("name"):
+                lookup[str(item["code"])] = item["name"]
+        for item in strat.get("sectors", []):
+            if item.get("code") and item.get("name"):
+                lookup[str(item["code"])] = item["name"]
+        for pair in strat.get("pairs", []):
+            if pair.get("name"):
+                for field in ("stock_a", "stock_b", "hedge_etf"):
+                    code = pair.get(field)
+                    if code:
+                        lookup[str(code)] = f"{pair['name']}_{field}"
+    return lookup
+
+
+_name_cache: dict[str, str] | None = None
+
+
+def _get_name(code: str, fallback: str = "") -> str:
+    """종목코드로 이름 조회 (settings.yaml 캐시)"""
+    global _name_cache
+    if _name_cache is None:
+        _name_cache = _build_name_lookup()
+    return _name_cache.get(code, fallback or code)
+
+
 def _to_frontend_position(p: dict) -> dict:
     """DB 포지션 → 프론트엔드 Position 형식"""
     entry = p["entry_price"]
     current = p["current_price"]
     quantity = p["quantity"]
+    code = p["code"]
     profit_amt = (current - entry) * quantity
     profit_pct = ((current - entry) / entry * 100) if entry > 0 else 0
     return {
-        "code": p["code"],
-        "name": p["code"],
+        "code": code,
+        "name": p.get("name") or _get_name(code),
         "quantity": quantity,
         "avg_price": entry,
         "current_price": current,
         "profit_pct": round(profit_pct, 2),
         "profit_amt": round(profit_amt, 2),
         "market": p["market"],
+        "strategy": p.get("strategy", ""),
     }
 
 

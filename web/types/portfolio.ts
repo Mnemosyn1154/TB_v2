@@ -7,6 +7,7 @@ export interface Position {
   profit_pct: number;
   profit_amt: number;
   market: "KR" | "US";
+  strategy?: string;
 }
 
 export interface RiskSummary {
