@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ChevronDown, ChevronUp, Trash2, Plus } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2, Plus, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   snakeToTitle,
@@ -75,6 +75,7 @@ export function StrategyCard({
   onDelete,
 }: StrategyCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   // Editing state
@@ -118,10 +119,15 @@ export function StrategyCard({
   }
 
   function toggleExpand() {
-    if (!expanded) {
-      initEditing();
+    if (expanded) {
+      setEditing(false);
     }
     setExpanded(!expanded);
+  }
+
+  function startEditing() {
+    initEditing();
+    setEditing(true);
   }
 
   function handleSave() {
@@ -131,11 +137,12 @@ export function StrategyCard({
     if (hasPairs) updated.pairs = pairs;
     if (hasCodes) updated.universe_codes = codes;
     onSave(strategyKey, updated);
+    setEditing(false);
     setExpanded(false);
   }
 
   function handleCancel() {
-    setExpanded(false);
+    setEditing(false);
   }
 
   function updatePair(idx: number, field: keyof Pair, value: string) {
@@ -182,6 +189,394 @@ export function StrategyCard({
     return null;
   }
 
+  // ── Read-only detail view ──
+
+  function ReadOnlyView() {
+    return (
+      <CardContent className="flex flex-col gap-4 border-t px-6 pt-5 pb-6">
+        {/* Numeric parameters */}
+        {numericParams.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <h4 className="text-sm font-medium text-muted-foreground">
+              파라미터
+            </h4>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+              {numericParams.map((p) => (
+                <div key={p.field} className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">{p.label}</span>
+                  <span className="font-mono">{p.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* String parameters */}
+        {stringParams.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <h4 className="text-sm font-medium text-muted-foreground">
+              코드 / 문자열
+            </h4>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+              {stringParams.map((p) => (
+                <div key={p.field} className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">{p.label}</span>
+                  <span className="font-mono">{p.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Pairs (read-only) */}
+        {hasPairs && (config.pairs as Pair[]).length > 0 && (
+          <div className="flex flex-col gap-2">
+            <h4 className="text-sm font-medium text-muted-foreground">페어</h4>
+            <div className="flex flex-col gap-1.5">
+              {(config.pairs as Pair[]).map((p) => (
+                <div
+                  key={p.name}
+                  className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                >
+                  <span className="font-medium">{p.name}</span>
+                  <Badge variant="outline" className="text-xs">
+                    {p.market}
+                  </Badge>
+                  <span className="font-mono text-muted-foreground">
+                    {p.stock_a} / {p.stock_b}
+                  </span>
+                  <span className="font-mono text-xs text-muted-foreground">
+                    헤지: {p.hedge_etf}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Universe codes (read-only) */}
+        {hasCodes && (config.universe_codes as UniverseCode[]).length > 0 && (
+          <div className="flex flex-col gap-2">
+            <h4 className="text-sm font-medium text-muted-foreground">
+              유니버스 종목
+            </h4>
+            <div className="flex flex-wrap gap-1.5">
+              {(config.universe_codes as UniverseCode[]).map((c) => (
+                <Badge key={c.code} variant="outline" className="font-mono">
+                  {c.code} {c.name}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ETF fields (read-only) */}
+        {!hasPairs && !hasCodes && (() => {
+          const etfItems = Object.entries(config)
+            .filter(([k, v]) => typeof v === "string" && k.includes("etf"))
+            .map(([k, v]) => ({
+              label: k.replace(/_/g, " ").toUpperCase(),
+              code: v as string,
+            }));
+          if (etfItems.length === 0) return null;
+          return (
+            <div className="flex flex-col gap-2">
+              <h4 className="text-sm font-medium text-muted-foreground">
+                ETF
+              </h4>
+              <div className="flex flex-wrap gap-3">
+                {etfItems.map((item) => (
+                  <div
+                    key={item.label}
+                    className="flex items-center gap-2 rounded-md border px-3 py-2"
+                  >
+                    <span className="text-xs text-muted-foreground">
+                      {item.label}
+                    </span>
+                    <span className="font-mono text-sm font-medium">
+                      {item.code}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Actions */}
+        <div className="flex justify-between border-t pt-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive hover:text-destructive"
+            onClick={() => setDeleteOpen(true)}
+          >
+            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+            삭제
+          </Button>
+          <Button variant="outline" size="sm" onClick={startEditing}>
+            <Pencil className="mr-1.5 h-3.5 w-3.5" />
+            편집
+          </Button>
+        </div>
+      </CardContent>
+    );
+  }
+
+  // ── Edit view ──
+
+  function EditView() {
+    return (
+      <CardContent className="flex flex-col gap-5 border-t px-6 pt-5 pb-6">
+        {/* Numeric parameters */}
+        {numericParams.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <h4 className="text-sm font-medium text-muted-foreground">
+              파라미터
+            </h4>
+            <div className="grid grid-cols-2 gap-3">
+              {numericParams.map((p) => (
+                <div key={p.field} className="flex flex-col gap-1.5">
+                  <Label
+                    htmlFor={`${strategyKey}-${p.field}`}
+                    className="text-sm"
+                  >
+                    {p.label}
+                  </Label>
+                  <Input
+                    id={`${strategyKey}-${p.field}`}
+                    type="number"
+                    step="any"
+                    value={numericValues[p.field] ?? ""}
+                    onChange={(e) =>
+                      setNumericValues((prev) => ({
+                        ...prev,
+                        [p.field]: parseFloat(e.target.value) || 0,
+                      }))
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* String parameters (ETF codes etc.) */}
+        {stringParams.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <h4 className="text-sm font-medium text-muted-foreground">
+              코드 / 문자열
+            </h4>
+            <div className="grid grid-cols-2 gap-3">
+              {stringParams.map((p) => (
+                <div key={p.field} className="flex flex-col gap-1.5">
+                  <Label
+                    htmlFor={`${strategyKey}-${p.field}`}
+                    className="text-sm"
+                  >
+                    {p.label}
+                  </Label>
+                  <Input
+                    id={`${strategyKey}-${p.field}`}
+                    type="text"
+                    value={stringValues[p.field] ?? ""}
+                    onChange={(e) =>
+                      setStringValues((prev) => ({
+                        ...prev,
+                        [p.field]: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Pairs editing (stat_arb) */}
+        {hasPairs && (
+          <div className="flex flex-col gap-2">
+            <h4 className="text-sm font-medium text-muted-foreground">페어</h4>
+            {pairs.map((pair, idx) => (
+              <div
+                key={idx}
+                className="grid grid-cols-[1fr_auto] gap-2 rounded-md border p-3"
+              >
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    placeholder="이름"
+                    value={pair.name}
+                    onChange={(e) => updatePair(idx, "name", e.target.value)}
+                  />
+                  <Select
+                    value={pair.market}
+                    onValueChange={(v) => updatePair(idx, "market", v)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="KR">KR</SelectItem>
+                      <SelectItem value="US">US</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    placeholder="종목 A"
+                    value={pair.stock_a}
+                    onChange={(e) =>
+                      updatePair(idx, "stock_a", e.target.value)
+                    }
+                  />
+                  <Input
+                    placeholder="종목 B"
+                    value={pair.stock_b}
+                    onChange={(e) =>
+                      updatePair(idx, "stock_b", e.target.value)
+                    }
+                  />
+                  <Input
+                    placeholder="헤지 ETF"
+                    value={pair.hedge_etf}
+                    onChange={(e) =>
+                      updatePair(idx, "hedge_etf", e.target.value)
+                    }
+                  />
+                  {pair.market === "US" && (
+                    <>
+                      <Input
+                        placeholder="거래소 A (예: NAS)"
+                        value={pair.exchange_a ?? ""}
+                        onChange={(e) =>
+                          updatePair(idx, "exchange_a", e.target.value)
+                        }
+                      />
+                      <Input
+                        placeholder="거래소 B"
+                        value={pair.exchange_b ?? ""}
+                        onChange={(e) =>
+                          updatePair(idx, "exchange_b", e.target.value)
+                        }
+                      />
+                      <Input
+                        placeholder="거래소 헤지"
+                        value={pair.exchange_hedge ?? ""}
+                        onChange={(e) =>
+                          updatePair(idx, "exchange_hedge", e.target.value)
+                        }
+                      />
+                    </>
+                  )}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="self-start text-destructive"
+                  onClick={() =>
+                    setPairs((prev) => prev.filter((_, i) => i !== idx))
+                  }
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              variant="outline"
+              size="sm"
+              className="self-start"
+              onClick={() =>
+                setPairs((prev) => [...prev, { ...EMPTY_PAIR }])
+              }
+            >
+              <Plus className="size-4 mr-1" />
+              페어 추가
+            </Button>
+          </div>
+        )}
+
+        {/* Universe codes editing (quant_factor) */}
+        {hasCodes && (
+          <div className="flex flex-col gap-2">
+            <h4 className="text-sm font-medium text-muted-foreground">
+              유니버스 종목
+            </h4>
+            {codes.map((item, idx) => (
+              <div
+                key={idx}
+                className="grid grid-cols-[1fr_auto] gap-2 items-center"
+              >
+                <div className="grid grid-cols-3 gap-2">
+                  <Input
+                    placeholder="코드"
+                    value={item.code}
+                    onChange={(e) => updateCode(idx, "code", e.target.value)}
+                  />
+                  <Select
+                    value={item.market}
+                    onValueChange={(v) => updateCode(idx, "market", v)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="KR">KR</SelectItem>
+                      <SelectItem value="US">US</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    placeholder="종목명"
+                    value={item.name}
+                    onChange={(e) => updateCode(idx, "name", e.target.value)}
+                  />
+                  {item.market === "US" && (
+                    <Input
+                      placeholder="거래소 (예: NAS)"
+                      value={item.exchange ?? ""}
+                      onChange={(e) =>
+                        updateCode(idx, "exchange", e.target.value)
+                      }
+                      className="col-span-3"
+                    />
+                  )}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-destructive"
+                  onClick={() =>
+                    setCodes((prev) => prev.filter((_, i) => i !== idx))
+                  }
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              variant="outline"
+              size="sm"
+              className="self-start"
+              onClick={() =>
+                setCodes((prev) => [...prev, { ...EMPTY_CODE }])
+              }
+            >
+              <Plus className="size-4 mr-1" />
+              종목 추가
+            </Button>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex justify-end gap-2 border-t pt-4">
+          <Button variant="outline" size="sm" onClick={handleCancel}>
+            취소
+          </Button>
+          <Button size="sm" onClick={handleSave}>
+            저장
+          </Button>
+        </div>
+      </CardContent>
+    );
+  }
+
   return (
     <>
       <Card
@@ -226,273 +621,12 @@ export function StrategyCard({
           </div>
         )}
 
-        {/* Expanded — inline editing */}
-        {expanded && (
-          <CardContent className="flex flex-col gap-5 border-t px-6 pt-5 pb-6">
-            {/* Numeric parameters */}
-            {numericParams.length > 0 && (
-              <div className="flex flex-col gap-3">
-                <h4 className="text-sm font-medium text-muted-foreground">
-                  파라미터
-                </h4>
-                <div className="grid grid-cols-2 gap-3">
-                  {numericParams.map((p) => (
-                    <div key={p.field} className="flex flex-col gap-1.5">
-                      <Label
-                        htmlFor={`${strategyKey}-${p.field}`}
-                        className="text-sm"
-                      >
-                        {p.label}
-                      </Label>
-                      <Input
-                        id={`${strategyKey}-${p.field}`}
-                        type="number"
-                        step="any"
-                        value={numericValues[p.field] ?? ""}
-                        onChange={(e) =>
-                          setNumericValues((prev) => ({
-                            ...prev,
-                            [p.field]: parseFloat(e.target.value) || 0,
-                          }))
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* String parameters (ETF codes etc.) */}
-            {stringParams.length > 0 && (
-              <div className="flex flex-col gap-3">
-                <h4 className="text-sm font-medium text-muted-foreground">
-                  코드 / 문자열
-                </h4>
-                <div className="grid grid-cols-2 gap-3">
-                  {stringParams.map((p) => (
-                    <div key={p.field} className="flex flex-col gap-1.5">
-                      <Label
-                        htmlFor={`${strategyKey}-${p.field}`}
-                        className="text-sm"
-                      >
-                        {p.label}
-                      </Label>
-                      <Input
-                        id={`${strategyKey}-${p.field}`}
-                        type="text"
-                        value={stringValues[p.field] ?? ""}
-                        onChange={(e) =>
-                          setStringValues((prev) => ({
-                            ...prev,
-                            [p.field]: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Pairs editing (stat_arb) */}
-            {hasPairs && (
-              <div className="flex flex-col gap-2">
-                <h4 className="text-sm font-medium text-muted-foreground">
-                  페어
-                </h4>
-                {pairs.map((pair, idx) => (
-                  <div
-                    key={idx}
-                    className="grid grid-cols-[1fr_auto] gap-2 rounded-md border p-3"
-                  >
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        placeholder="이름"
-                        value={pair.name}
-                        onChange={(e) => updatePair(idx, "name", e.target.value)}
-                      />
-                      <Select
-                        value={pair.market}
-                        onValueChange={(v) => updatePair(idx, "market", v)}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="KR">KR</SelectItem>
-                          <SelectItem value="US">US</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        placeholder="종목 A"
-                        value={pair.stock_a}
-                        onChange={(e) =>
-                          updatePair(idx, "stock_a", e.target.value)
-                        }
-                      />
-                      <Input
-                        placeholder="종목 B"
-                        value={pair.stock_b}
-                        onChange={(e) =>
-                          updatePair(idx, "stock_b", e.target.value)
-                        }
-                      />
-                      <Input
-                        placeholder="헤지 ETF"
-                        value={pair.hedge_etf}
-                        onChange={(e) =>
-                          updatePair(idx, "hedge_etf", e.target.value)
-                        }
-                      />
-                      {pair.market === "US" && (
-                        <>
-                          <Input
-                            placeholder="거래소 A (예: NAS)"
-                            value={pair.exchange_a ?? ""}
-                            onChange={(e) =>
-                              updatePair(idx, "exchange_a", e.target.value)
-                            }
-                          />
-                          <Input
-                            placeholder="거래소 B"
-                            value={pair.exchange_b ?? ""}
-                            onChange={(e) =>
-                              updatePair(idx, "exchange_b", e.target.value)
-                            }
-                          />
-                          <Input
-                            placeholder="거래소 헤지"
-                            value={pair.exchange_hedge ?? ""}
-                            onChange={(e) =>
-                              updatePair(idx, "exchange_hedge", e.target.value)
-                            }
-                          />
-                        </>
-                      )}
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="self-start text-destructive"
-                      onClick={() =>
-                        setPairs((prev) => prev.filter((_, i) => i !== idx))
-                      }
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
-                ))}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="self-start"
-                  onClick={() =>
-                    setPairs((prev) => [...prev, { ...EMPTY_PAIR }])
-                  }
-                >
-                  <Plus className="size-4 mr-1" />
-                  페어 추가
-                </Button>
-              </div>
-            )}
-
-            {/* Universe codes editing (quant_factor) */}
-            {hasCodes && (
-              <div className="flex flex-col gap-2">
-                <h4 className="text-sm font-medium text-muted-foreground">
-                  유니버스 종목
-                </h4>
-                {codes.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="grid grid-cols-[1fr_auto] gap-2 items-center"
-                  >
-                    <div className="grid grid-cols-3 gap-2">
-                      <Input
-                        placeholder="코드"
-                        value={item.code}
-                        onChange={(e) => updateCode(idx, "code", e.target.value)}
-                      />
-                      <Select
-                        value={item.market}
-                        onValueChange={(v) => updateCode(idx, "market", v)}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="KR">KR</SelectItem>
-                          <SelectItem value="US">US</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        placeholder="종목명"
-                        value={item.name}
-                        onChange={(e) => updateCode(idx, "name", e.target.value)}
-                      />
-                      {item.market === "US" && (
-                        <Input
-                          placeholder="거래소 (예: NAS)"
-                          value={item.exchange ?? ""}
-                          onChange={(e) =>
-                            updateCode(idx, "exchange", e.target.value)
-                          }
-                          className="col-span-3"
-                        />
-                      )}
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-destructive"
-                      onClick={() =>
-                        setCodes((prev) => prev.filter((_, i) => i !== idx))
-                      }
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
-                ))}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="self-start"
-                  onClick={() =>
-                    setCodes((prev) => [...prev, { ...EMPTY_CODE }])
-                  }
-                >
-                  <Plus className="size-4 mr-1" />
-                  종목 추가
-                </Button>
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="flex justify-between border-t pt-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-destructive hover:text-destructive"
-                onClick={() => setDeleteOpen(true)}
-              >
-                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                삭제
-              </Button>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={handleCancel}>
-                  취소
-                </Button>
-                <Button size="sm" onClick={handleSave}>
-                  저장
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        )}
+        {/* Expanded — read-only or editing */}
+        {expanded && (editing ? <EditView /> : <ReadOnlyView />)}
       </Card>
 
       {/* Delete confirmation dialog */}
-      <Dialog open={deleteOpen} onOpenChange={(v) => !v && setDeleteOpen(false)}>
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>전략 삭제</DialogTitle>
