@@ -146,7 +146,8 @@ export function BacktestForm({ strategies, onRun, loading }: BacktestFormProps) 
           </div>
 
           {/* Run Button */}
-          <div className="flex items-end">
+          <div>
+            <Label className="mb-1.5 text-xs invisible">실행</Label>
             <Button
               onClick={handleSubmit}
               disabled={loading}
