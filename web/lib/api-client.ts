@@ -127,6 +127,11 @@ export const toggleKillSwitch = (action: "activate" | "deactivate") =>
     body: JSON.stringify({ action }),
   });
 export const getBotStatus = () => fetchApi("/bot/status");
+export const toggleScheduler = (action: "start" | "stop") =>
+  fetchApi(`/bot/scheduler`, {
+    method: "POST",
+    body: JSON.stringify({ action }),
+  });
 
 // Signals
 export const getSignals = () => fetchApi("/signals");

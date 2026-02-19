@@ -55,3 +55,42 @@ def deactivate_kill_switch(secret: None = Depends(verify_secret)):
 
     deactivate_kill_switch()
     return {"data": {"kill_switch": False}, "error": None}
+
+
+@router.get("/status")
+def bot_status(secret: None = Depends(verify_secret)):
+    """봇 상태 조회 (kill switch + scheduler)"""
+    from dashboard.services.bot_service import get_kill_switch_status
+    from pyapi.scheduler import get_status as get_scheduler_status
+
+    return {
+        "data": {
+            "kill_switch": get_kill_switch_status(),
+            "scheduler": get_scheduler_status(),
+        },
+        "error": None,
+    }
+
+
+@router.post("/scheduler/start")
+def scheduler_start(secret: None = Depends(verify_secret)):
+    """스케줄러 시작"""
+    from pyapi.scheduler import start_scheduler, get_status
+
+    try:
+        start_scheduler()
+        return {"data": get_status(), "error": None}
+    except Exception as e:
+        return {"data": None, "error": str(e)}
+
+
+@router.post("/scheduler/stop")
+def scheduler_stop(secret: None = Depends(verify_secret)):
+    """스케줄러 중지"""
+    from pyapi.scheduler import stop_scheduler, get_status
+
+    try:
+        stop_scheduler()
+        return {"data": get_status(), "error": None}
+    except Exception as e:
+        return {"data": None, "error": str(e)}

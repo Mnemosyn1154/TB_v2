@@ -293,6 +293,8 @@ logging:
   rotation: 10 MB
   retention: 30 days
 scheduler:
+  enabled: false
+  interval_minutes: 15
   kr_market_open: '09:00'
   kr_market_close: '15:30'
   us_market_open: '09:30'

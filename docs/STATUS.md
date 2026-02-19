@@ -37,6 +37,8 @@
   - RiskManager initial_capital fallback, 시그널 프리뷰 예상 수량/가격
 - 대시보드 UX: 토스트 에러 알림, bot/run 후 캐시 자동 무효화
 - 장 운영시간 체크 (KR/US), 데이터 신선도 경고
+- APScheduler 15분 주기 자동 실행 (장중에만 실행, 킬스위치 연동)
+  - 대시보드에서 스케줄러 on/off 토글, 다음 실행/마지막 실행 상태 표시
 - 테스트: 49 tests (시뮬레이션 E2E + 전략 유닛)
 - 다크 모드 (기본값)
 - Cloudflare Pages + Tunnel 배포 파이프라인
@@ -60,6 +62,14 @@
 | sam_hynix | `sam_hynix` | DISABLED | stat_arb 타입, 삼성전자/SK하이닉스 KR 페어 |
 
 ## 최근 주요 변경
+
+### 2026-02-19: APScheduler 15분 주기 자동 실행
+
+- `pyapi/scheduler.py` — APScheduler BackgroundScheduler 래퍼 (start/stop/status)
+- `pyapi/main.py` — lifespan에 스케줄러 자동 시작/종료
+- `pyapi/routers/bot.py` — `/py/bot/status`, `/py/bot/scheduler/start|stop` 엔드포인트
+- `config/settings.yaml` — `scheduler.enabled`, `scheduler.interval_minutes` 추가
+- 대시보드 Control 탭에 스케줄러 토글 + 상태 표시 UI
 
 ### 2026-02-19: 시뮬레이션 이슈 수정 (Phase 1–4)
 
