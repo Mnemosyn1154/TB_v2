@@ -23,6 +23,8 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "stat_arb": StatArbStrategy,
     "dual_momentum": DualMomentumStrategy,
     "quant_factor": QuantFactorStrategy,
+    "sector_rotation": SectorRotationStrategy,
+    "volatility_breakout": VolatilityBreakoutStrategy,
 }
 ```
 
@@ -179,6 +181,36 @@ class TradeSignal:
 > US 유니버스 종목은 `exchange` 필드 필수: `{ code: "AAPL", market: "US", exchange: "NAS" }`
 
 **입력 형식**: `generate_signals(price_data={"005930": Series, "MSFT": Series, ...})`
+
+---
+
+### volatility_breakout.py — 변동성 돌파 (래리 윌리엄스)
+
+**상태**: `enabled: false`
+
+**알고리즘**:
+1. 전일 OHLC 추출 → 목표가 = 오늘 시가 + 전일 (고가 - 저가) × k
+2. 장중 현재가가 목표가 이상이면 매수 (종목당 1회)
+3. 장 마감 직전 전량 청산 (일중 전략)
+4. 백테스트: 당일 고가 ≥ 목표가이면 목표가에 매수 근사, 익일 종가 청산
+
+**특이사항**:
+- `needs_ohlc = True` — OHLC DataFrame을 수신 (다른 전략은 종가 Series만 사용)
+- 백테스트 엔진에서 bisect 기반 OHLC 날짜 캐시로 look-ahead bias 방지
+- `on_trade_executed()` 콜백으로 `current_holdings`/`today_entered` 상태 동기화
+
+| 파라미터 | 설정키 | 기본값 | 설명 |
+|----------|--------|--------|------|
+| k 값 | `k` | 0.5 | 변동성 돌파 계수 |
+| 시장 | `market` | "KR" | 기본 시장 |
+| 종목당 최대 보유 | `max_hold_per_stock` | 1 | 동일 종목 중복 진입 방지 |
+| 장마감 청산 | `close_at_market_end` | true | 장 종료 시 전량 청산 |
+| KR 청산 시각 | `kr_close_time` | "15:15" | 한국 시장 청산 시각 |
+| US 청산 시각 | `us_close_time` | "15:45" | 미국 시장 청산 시각 |
+
+**유니버스**: KR 블루칩 5종목 — 삼성전자, SK하이닉스, 현대차, NAVER, 셀트리온
+
+**입력 형식**: `generate_signals(ohlc_data={"005930": DataFrame}, current_prices={"005930": 54000})`
 
 ---
 

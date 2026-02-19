@@ -25,7 +25,7 @@
 - Python API 7개 라우터 (portfolio, backtest, bot, signals, paper, benchmark, simulation)
 - 웹 대시보드 6탭 전체 구현 및 백엔드 연동
 - KIS API 통합 (실매매 + 모의투자)
-- 백테스트 엔진 (3개 전략, yfinance 기반, inf/NaN 안전 직렬화)
+- 백테스트 엔진 (5개 전략, yfinance 기반, inf/NaN 안전 직렬화, OHLC 전략 지원)
 - 백테스트 실행 로그 (전략별 사람이 읽을 수 있는 요약)
 - 전략 인스턴스 CRUD (웹에서 전략 생성/삭제)
 - 전략 파라미터 편집 (숫자/문자열 + pairs + universe_codes + sectors)
@@ -39,7 +39,7 @@
 - 장 운영시간 체크 (KR/US), 데이터 신선도 경고
 - APScheduler 15분 주기 자동 실행 (장중에만 실행, 킬스위치 연동)
   - 대시보드에서 스케줄러 on/off 토글, 다음 실행/마지막 실행 상태 표시
-- 테스트: 49 tests (시뮬레이션 E2E + 전략 유닛)
+- 테스트: 85 tests (시뮬레이션 E2E + 전략 유닛)
 - 다크 모드 (기본값)
 - Cloudflare Pages + Tunnel 배포 파이프라인
 
@@ -60,8 +60,27 @@
 | sector_rotation | `sector_rotation` | ENABLED | US 7섹터 + KR 3섹터 ETF, top_n=3, 6개월 룩백 |
 | quant_factor | `quant_factor` | DISABLED | 멀티팩터 스코어링, KR 25 + US 15 = 40종목 유니버스 |
 | sam_hynix | `sam_hynix` | DISABLED | stat_arb 타입, 삼성전자/SK하이닉스 KR 페어 |
+| volatility_breakout | `volatility_breakout` | DISABLED | 래리 윌리엄스 변동성 돌파, KR 5종목 (삼성전자/SK하이닉스/현대차/NAVER/셀트리온) |
 
 ## 최근 주요 변경
+
+### 2026-02-19: 변동성 돌파 전략 (PR #17)
+
+- `src/strategies/volatility_breakout.py` — 래리 윌리엄스 변동성 돌파 전략
+  - 목표가 = 오늘 시가 + 전일 (고가 - 저가) × k
+  - 백테스트: 고가 ≥ 목표가 → 목표가에 매수 근사, 익일 청산
+  - 실시간: 현재가 ≥ 목표가 → 매수, 장 마감 전 청산
+  - `needs_ohlc = True` 플래그로 OHLC DataFrame 수신
+- `src/backtest/engine.py` — OHLC 전략 지원 (bisect 기반 날짜 캐시, signal.price 우선)
+- `config/settings.yaml` — `volatility_breakout` 설정 (k=0.5, KR 5종목, disabled)
+- `tests/test_strategies.py` — VolatilityBreakout 유닛 테스트 20개 추가
+- `main.py` — OHLC 데이터 로딩 + 실시간 현재가 주입 + backtest-yf 선택지 추가
+
+### 2026-02-19: 절대 모멘텀 필터 (PR #15, #16)
+
+- `src/strategies/quant_factor.py` — 절대 모멘텀 필터 추가 (하락 추세 종목 → 안전자산 대체)
+- `src/core/risk_manager.py` — 전략별 자본 할당 기능
+- `tests/test_strategies.py` — AbsoluteMomentum 필터 테스트 7개 추가
 
 ### 2026-02-19: APScheduler 15분 주기 자동 실행
 

@@ -159,6 +159,8 @@ STRATEGY_REGISTRY = {
     "stat_arb": StatArbStrategy,
     "dual_momentum": DualMomentumStrategy,
     "quant_factor": QuantFactorStrategy,
+    "sector_rotation": SectorRotationStrategy,
+    "volatility_breakout": VolatilityBreakoutStrategy,
 }
 
 def resolve_strategy(config_key: str, strat_config: dict) -> BaseStrategy:
@@ -187,6 +189,8 @@ strategies:                   # 전략별 파라미터
   stat_arb:                   # 페어, z-score, lookback 등
   dual_momentum:              # ETF, 리밸런싱, 모멘텀 기간
   quant_factor:               # 팩터 가중치, 유니버스, top_n
+  sector_rotation:            # 섹터 ETF 로테이션, 모멘텀 기반
+  volatility_breakout:        # 래리 윌리엄스 변동성 돌파, OHLC 기반
 
 risk:                         # 리스크 관리
   max_position_pct, stop_loss_pct, daily_loss_limit_pct,

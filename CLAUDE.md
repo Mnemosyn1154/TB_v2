@@ -69,7 +69,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ## 프로젝트 개요
 
 D2trader — 한국/미국 주식 알고리즘 트레이딩 대시보드.
-KIS Open API(한국투자증권)를 통해 3개 전략(stat_arb, dual_momentum, quant_factor)을 자동 매매하며,
+KIS Open API(한국투자증권)를 통해 5개 전략(stat_arb, dual_momentum, quant_factor, sector_rotation, volatility_breakout)을 자동 매매하며,
 Next.js 웹 대시보드에서 포트폴리오 모니터링, 백테스트, 페이퍼 트레이딩, 봇 제어를 수행한다.
 
 - **백엔드**: Python 3.12 + FastAPI (pyapi/) + 코어 엔진 (src/)
@@ -102,7 +102,7 @@ TB_v2/
 ├── config/settings.yaml     # 전략/리스크/브로커 설정 (YAML)
 ├── src/                     # Python 코어 엔진
 │   ├── core/                # KIS 브로커, 설정 로더, DB, 리스크 관리
-│   ├── strategies/          # 3개 전략 (BaseStrategy 플러그인 시스템)
+│   ├── strategies/          # 5개 전략 (BaseStrategy 플러그인 시스템)
 │   ├── execution/           # 데이터 수집 + 주문 실행
 │   ├── backtest/            # 백테스트 엔진 + 성과 분석
 │   └── utils/               # 로거(loguru), 텔레그램 알림
@@ -123,7 +123,7 @@ TB_v2/
 ├── tests/                   # pytest 테스트
 │   ├── conftest.py          # 공통 fixture (in-memory SQLite tracker)
 │   ├── test_simulation_e2e.py  # 시뮬레이션 E2E (매수/매도/P&L/스냅샷)
-│   └── test_strategies.py   # 전략 유닛 테스트 (StatArb/DualMomentum/QuantFactor)
+│   └── test_strategies.py   # 전략 유닛 테스트 (StatArb/DualMomentum/QuantFactor/VolatilityBreakout)
 ├── dashboard/               # Streamlit 레거시 UI
 │   └── services/            # 비즈니스 로직 (일부 pyapi에서 import)
 ├── deploy/                  # systemd 서비스, Cloudflare Tunnel, deploy.sh
@@ -194,9 +194,10 @@ python3 main.py backtest-yf -s stat_arb --start 2020-01-01 --end 2024-12-31
   - 실주문 차단 가드, DB 트랜잭션, 포지션 가격 갱신, 스냅샷 기록
 - **Python 3.12**: pyenv로 3.12.12 사용 (`.python-version`), 3.10+ 타입 문법 지원
 - **quant_factor 전략**: settings.yaml에서 disabled (enabled: false)
-- **테스트**: 49 tests 통과 (`python -m pytest tests/`)
+- **volatility_breakout 전략**: 래리 윌리엄스 변동성 돌파, OHLC 기반 일중 전략 (disabled by default)
+- **테스트**: 85 tests 통과 (`python -m pytest tests/`)
   - `tests/test_simulation_e2e.py` — PortfolioTracker E2E (13 tests)
-  - `tests/test_strategies.py` — StatArb/DualMomentum/QuantFactor 유닛 (36 tests)
+  - `tests/test_strategies.py` — StatArb/DualMomentum/QuantFactor/AbsMomentum/VolatilityBreakout 유닛 (72 tests)
 - **Settings API**: Python API 없이 Next.js에서 settings.yaml 직접 읽기/쓰기
 - **전략 편집**: StrategyEditor에서 숫자/문자열 파라미터, pairs, universe_codes 편집 가능
 - **백테스트**: inf/NaN 안전 직렬화, 사람이 읽을 수 있는 실행 로그 제공
