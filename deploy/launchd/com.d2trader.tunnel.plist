@@ -37,7 +37,7 @@ launchd는 systemd의 After=/Requires= 같은 서비스 의존성을 지원하�
   <key>ProgramArguments</key>
   <array>
     <string><PROJECT_DIR>/deploy/launchd/wait-for-pyapi.sh</string>
-    <string>cloudflared</string>
+    <string><CLOUDFLARED_BIN></string>
     <string>tunnel</string>
     <string>run</string>
     <string>d2trader-api</string>

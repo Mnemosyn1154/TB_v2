@@ -90,6 +90,11 @@ _setup_macos_launchd() {
     mkdir -p "$launch_agents" "$log_dir"
     chmod +x "$launchd_src/wait-for-pyapi.sh"
 
+    local node_bin
+    node_bin="$(command -v node 2>/dev/null || echo "/usr/local/bin/node")"
+    local cloudflared_bin
+    cloudflared_bin="$(command -v cloudflared 2>/dev/null || echo "cloudflared")"
+
     for plist in com.d2trader.pyapi.plist com.d2trader.nextjs.plist com.d2trader.tunnel.plist; do
         local dest="$launch_agents/$plist"
         # 이미 로드된 경우 먼저 unload
@@ -97,6 +102,8 @@ _setup_macos_launchd() {
 
         sed -e "s|<USER>|${USER}|g" \
             -e "s|<PROJECT_DIR>|${PROJECT_ROOT}|g" \
+            -e "s|<NODE_BIN>|${node_bin}|g" \
+            -e "s|<CLOUDFLARED_BIN>|${cloudflared_bin}|g" \
             "$launchd_src/$plist" > "$dest"
         info "  $plist → $dest"
     done
@@ -317,7 +324,8 @@ _logs_linux() {
     case "$service" in
         pyapi)   sudo journalctl -u d2trader-pyapi -f --no-pager ;;
         tunnel)  sudo journalctl -u d2trader-tunnel -f --no-pager ;;
-        *)       error "사용법: deploy.sh logs [pyapi|tunnel]" ;;
+        nextjs)  error "Linux에서 Next.js 로그는 systemd로 관리되지 않습니다." ;;
+        *)       error "사용법: deploy.sh logs [pyapi|nextjs|tunnel]" ;;
     esac
 }
 

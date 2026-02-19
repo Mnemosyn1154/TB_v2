@@ -29,7 +29,7 @@ D2trader Next.js — launchd plist (macOS)
 
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/local/bin/node</string>
+    <string><NODE_BIN></string>
     <string><PROJECT_DIR>/web/.next/standalone/server.js</string>
   </array>
 
@@ -44,6 +44,11 @@ D2trader Next.js — launchd plist (macOS)
     <string>3000</string>
     <key>HOSTNAME</key>
     <string>127.0.0.1</string>
+    <!-- pyapi 프록시에 필요. .env.local 값과 일치시킬 것 -->
+    <key>PYTHON_API_URL</key>
+    <string>http://localhost:8000</string>
+    <key>PYTHON_API_SECRET</key>
+    <string>your-secret-here</string>
   </dict>
 
   <key>KeepAlive</key>

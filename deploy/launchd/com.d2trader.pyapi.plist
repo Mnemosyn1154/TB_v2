@@ -21,8 +21,8 @@ D2trader Python API — launchd plist (macOS)
   launchd는 EnvironmentVariables 키만 지원하며 EnvironmentFile은 없다.
   아래 두 가지 방법 중 하나를 선택:
 
-  방법 A (권장): ExecStart를 wrapper script로 교체
-    ExecStart 키의 값을 <PROJECT_DIR>/deploy/launchd/start-pyapi.sh 로 바꾸고
+  방법 A (권장): ProgramArguments를 wrapper script로 교체
+    ProgramArguments 배열을 <PROJECT_DIR>/deploy/launchd/start-pyapi.sh 하나로 바꾸고
     스크립트에서 "source <PROJECT_DIR>/.env && uvicorn ..." 실행.
 
   방법 B: EnvironmentVariables에 직접 나열
