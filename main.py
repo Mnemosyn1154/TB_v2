@@ -322,7 +322,7 @@ def main():
     # yfinance 백테스트 (독립 실행)
     bt_yf_parser = subparsers.add_parser("backtest-yf", help="백테스트 (yfinance 데이터, API 키 불필요)")
     bt_yf_parser.add_argument("-s", "--strategy", required=True,
-                              choices=["stat_arb", "dual_momentum", "quant_factor", "sector_rotation", "volatility_breakout", "all"],
+                              choices=["stat_arb", "dual_momentum", "quant_factor", "sector_rotation", "volatility_breakout", "bollinger_band", "all"],
                               help="백테스트할 전략")
     bt_yf_parser.add_argument("--start", required=True,
                               help="시작일 (YYYY-MM-DD)")
