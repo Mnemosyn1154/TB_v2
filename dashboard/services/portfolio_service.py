@@ -153,12 +153,14 @@ def _build_name_lookup() -> dict[str, str]:
     lookup: dict[str, str] = {}
     strategies = config.get("strategies", {})
     for _key, strat in strategies.items():
+        # universe_codes, sectors (have explicit name field)
         for item in strat.get("universe_codes", []):
             if item.get("code") and item.get("name"):
                 lookup[str(item["code"])] = item["name"]
         for item in strat.get("sectors", []):
             if item.get("code") and item.get("name"):
                 lookup[str(item["code"])] = item["name"]
+        # pairs
         for pair in strat.get("pairs", []):
             if pair.get("name"):
                 for field in ("stock_a", "stock_b", "hedge_etf"):
@@ -168,15 +170,50 @@ def _build_name_lookup() -> dict[str, str]:
     return lookup
 
 
-_name_cache: dict[str, str] | None = None
+_name_cache: dict[str, str] = {}
+
+
+def _resolve_name_yf(code: str) -> str | None:
+    """yfinance에서 종목명 조회 (1회 호출 후 캐시)"""
+    try:
+        import yfinance as yf
+        # 한국 종목 (숫자 코드)
+        ticker_str = f"{code}.KS" if code.isdigit() else code
+        ticker = yf.Ticker(ticker_str)
+        info = ticker.info or {}
+        name = info.get("shortName") or info.get("longName")
+        if name:
+            return name
+        # .KS 실패 시 .KQ (코스닥) 시도
+        if code.isdigit():
+            ticker = yf.Ticker(f"{code}.KQ")
+            info = ticker.info or {}
+            return info.get("shortName") or info.get("longName")
+    except Exception:
+        pass
+    return None
 
 
 def _get_name(code: str, fallback: str = "") -> str:
-    """종목코드로 이름 조회 (settings.yaml 캐시)"""
-    global _name_cache
-    if _name_cache is None:
-        _name_cache = _build_name_lookup()
-    return _name_cache.get(code, fallback or code)
+    """종목코드로 이름 조회 (settings → yfinance 폴백, 캐시)"""
+    if code in _name_cache:
+        return _name_cache[code]
+
+    # 1. settings.yaml 매핑
+    if not _name_cache:
+        _name_cache.update(_build_name_lookup())
+        if code in _name_cache:
+            return _name_cache[code]
+
+    # 2. yfinance 폴백
+    name = _resolve_name_yf(code)
+    if name:
+        _name_cache[code] = name
+        return name
+
+    # 3. 최종 폴백
+    _name_cache[code] = fallback or code
+    return _name_cache[code]
 
 
 def _to_frontend_position(p: dict) -> dict:
