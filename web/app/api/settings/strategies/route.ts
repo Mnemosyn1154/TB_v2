@@ -39,6 +39,26 @@ const TYPE_DEFAULTS: Record<string, Record<string, unknown>> = {
     weights: { value: 0.3, quality: 0.3, momentum: 0.4 },
     universe_codes: [],
   },
+  sector_rotation: {
+    enabled: false,
+    top_n: 3,
+    lookback_months: 6,
+    rebalance_day: 1,
+    risk_free_rate: 0.04,
+    safe_asset: "SHY",
+    safe_asset_exchange: "NYS",
+    sectors: [],
+  },
+  volatility_breakout: {
+    enabled: false,
+    k: 0.5,
+    market: "KR",
+    max_hold_per_stock: 1,
+    close_at_market_end: true,
+    kr_close_time: "15:15",
+    us_close_time: "15:45",
+    universe_codes: [],
+  },
 };
 
 export async function POST(request: Request) {
