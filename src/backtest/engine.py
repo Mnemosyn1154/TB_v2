@@ -249,16 +249,15 @@ class BacktestEngine:
             return []
 
         # 2. 현재 날짜까지의 데이터 (look-ahead bias 방지)
+        truncated: dict = {}
         if getattr(self.strategy, "needs_ohlc", False):
             # OHLC 전략: 전체 DataFrame 전달
-            truncated: dict[str, pd.DataFrame] = {}
             for code, df in price_data.items():
                 ohlc = self._get_ohlc_until(df, code, date)
                 if len(ohlc) > 0:
                     truncated[code] = ohlc
         else:
             # 일반 전략: 종가 시리즈만 전달
-            truncated: dict[str, pd.Series] = {}
             for code, df in price_data.items():
                 prices = self._get_prices_until(df, date)
                 if len(prices) > 0:
