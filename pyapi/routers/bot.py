@@ -8,21 +8,22 @@ from pyapi.schemas import ModeRequest
 router = APIRouter(prefix="/py/bot", tags=["bot"])
 
 
-@router.get("/mode")
-def get_trading_mode(secret: None = Depends(verify_secret)):
-    """현재 트레이딩 모드 조회 (simulation / paper / live)"""
+def _get_current_mode() -> str:
+    """설정에서 현재 트레이딩 모드를 판별합니다."""
     from src.core.config import get_config
 
     config = get_config()
-    sim_enabled = config.get("simulation", {}).get("enabled", False)
-    live_trading = config.get("kis", {}).get("live_trading", False)
-    if sim_enabled:
-        mode = "simulation"
-    elif live_trading:
-        mode = "live"
-    else:
-        mode = "paper"
-    return {"data": {"mode": mode}, "error": None}
+    if config.get("simulation", {}).get("enabled", False):
+        return "simulation"
+    if config.get("kis", {}).get("live_trading", False):
+        return "live"
+    return "paper"
+
+
+@router.get("/mode")
+def get_trading_mode(secret: None = Depends(verify_secret)):
+    """현재 트레이딩 모드 조회 (simulation / paper / live)"""
+    return {"data": {"mode": _get_current_mode()}, "error": None}
 
 
 @router.post("/mode")
@@ -33,9 +34,8 @@ def set_trading_mode(req: ModeRequest, secret: None = Depends(verify_secret)):
     - paper: KIS 자격증명 검증 필수
     - live: KIS 검증 + confirm=true 필수
     """
-    from src.core.config import reload_config, load_env, CONFIG_DIR
-
-    import yaml
+    from src.core.config import reload_config, load_env
+    from dashboard.services.config_service import load_settings, save_settings
 
     load_env()
 
@@ -56,10 +56,8 @@ def set_trading_mode(req: ModeRequest, secret: None = Depends(verify_secret)):
         except Exception as e:
             return {"data": None, "error": f"KIS 연결 실패: {e}"}
 
-    # settings.yaml 업데이트
-    config_path = CONFIG_DIR / "settings.yaml"
-    with open(config_path, "r", encoding="utf-8") as f:
-        raw_config = yaml.safe_load(f)
+    # settings.yaml 업데이트 (원자적 쓰기, sort_keys=False로 키 순서 보존)
+    raw_config = load_settings()
 
     if req.mode == "simulation":
         raw_config.setdefault("simulation", {})["enabled"] = True
@@ -70,9 +68,7 @@ def set_trading_mode(req: ModeRequest, secret: None = Depends(verify_secret)):
         raw_config.setdefault("simulation", {})["enabled"] = False
         raw_config.setdefault("kis", {})["live_trading"] = True
 
-    with open(config_path, "w", encoding="utf-8") as f:
-        yaml.dump(raw_config, f, default_flow_style=False, allow_unicode=True)
-
+    save_settings(raw_config)
     reload_config()
 
     return {"data": {"mode": req.mode}, "error": None}
@@ -149,23 +145,12 @@ def bot_status(secret: None = Depends(verify_secret)):
     """봇 상태 조회 (kill switch + scheduler + mode)"""
     from dashboard.services.bot_service import get_kill_switch_status
     from pyapi.scheduler import get_status as get_scheduler_status
-    from src.core.config import get_config
-
-    config = get_config()
-    sim_enabled = config.get("simulation", {}).get("enabled", False)
-    live_trading = config.get("kis", {}).get("live_trading", False)
-    if sim_enabled:
-        mode = "simulation"
-    elif live_trading:
-        mode = "live"
-    else:
-        mode = "paper"
 
     return {
         "data": {
             "kill_switch": get_kill_switch_status(),
             "scheduler": get_scheduler_status(),
-            "mode": mode,
+            "mode": _get_current_mode(),
         },
         "error": None,
     }

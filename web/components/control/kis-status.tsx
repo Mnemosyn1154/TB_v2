@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { checkKisHealth } from "@/lib/api-client";
 import type { ApiResponse } from "@/types/common";
 
@@ -15,18 +15,22 @@ export function KisStatus() {
   const [health, setHealth] = useState<KisHealth | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = (await checkKisHealth()) as ApiResponse<KisHealth>;
-        setHealth(res.data ?? null);
-      } catch {
-        setHealth(null);
-      } finally {
-        setLoading(false);
-      }
-    })();
+  const fetchHealth = useCallback(async () => {
+    try {
+      const res = (await checkKisHealth()) as ApiResponse<KisHealth>;
+      setHealth(res.data ?? null);
+    } catch {
+      setHealth(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchHealth();
+    const id = setInterval(fetchHealth, 30_000);
+    return () => clearInterval(id);
+  }, [fetchHealth]);
 
   if (loading) {
     return (

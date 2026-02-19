@@ -14,9 +14,9 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { TABS, type TabKey } from "@/lib/constants";
 import { useBotStatus } from "@/hooks/use-bot-status";
+import { ModeBadge } from "@/components/control/mode-toggle";
 import type { TradingMode } from "@/types/control";
 
 const ICON_MAP = {
@@ -52,22 +52,7 @@ export function DashboardHeader({
         <div className="flex items-center gap-2">
           <h1 className="text-lg font-bold tracking-tight">D2trader</h1>
           <div className="hidden sm:flex items-center gap-1.5">
-            <Badge
-              variant={displayMode === "live" ? "destructive" : "secondary"}
-              className={`text-[10px] px-1.5 py-0 ${
-                displayMode === "simulation"
-                  ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
-                  : displayMode === "paper"
-                    ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
-                    : ""
-              }`}
-            >
-              {displayMode === "live"
-                ? "실거래"
-                : displayMode === "paper"
-                  ? "모의"
-                  : "시뮬"}
-            </Badge>
+            <ModeBadge mode={displayMode} />
             {botStatus?.kill_switch != null &&
               (botStatus.kill_switch ? (
                 <ShieldAlert className="h-4 w-4 text-destructive" />

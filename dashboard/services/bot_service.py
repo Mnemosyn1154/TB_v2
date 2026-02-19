@@ -109,6 +109,7 @@ def run_once() -> dict:
                         code=p["code"], market=p["market"], side="LONG",
                         quantity=p["quantity"], entry_price=p["avg_price"],
                         current_price=p["current_price"],
+                        strategy="unknown",
                     )
                     for p in kr_bal.get("positions", [])
                 ]
