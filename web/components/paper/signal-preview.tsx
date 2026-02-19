@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { Loader2, Play, Eye } from "lucide-react";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useApi } from "@/hooks/use-api";
@@ -102,22 +102,23 @@ export function SignalPreview({ onExecute, executing }: SignalPreviewProps) {
               </div>
             ))}
           </CardContent>
-          <CardFooter className="gap-2 pt-2">
-            <Button onClick={() => onExecute()} disabled={executing}>
-              {executing ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Play className="mr-2 h-4 w-4" />
-              )}
-              전체 모의 실행
-            </Button>
-            <Button variant="outline" onClick={refetch}>
-              <Eye className="mr-2 h-4 w-4" />
-              시그널 새로고침
-            </Button>
-          </CardFooter>
         </Card>
       ))}
+
+      <div className="flex gap-2">
+        <Button onClick={() => onExecute()} disabled={executing}>
+          {executing ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Play className="mr-2 h-4 w-4" />
+          )}
+          전체 모의 실행
+        </Button>
+        <Button variant="outline" onClick={refetch}>
+          <Eye className="mr-2 h-4 w-4" />
+          시그널 새로고침
+        </Button>
+      </div>
     </div>
   );
 }
