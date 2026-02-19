@@ -8,7 +8,7 @@ kis:
   rate_limit: 10
 strategies:
   stat_arb:
-    enabled: true
+    enabled: false
     pairs:
       - name: KO_PEP
         market: US
@@ -60,7 +60,7 @@ strategies:
     safe_us_etf_exchange: NYS
     risk_free_rate: 0.04
   quant_factor:
-    enabled: false
+    enabled: true
     top_n: 20
     rebalance_months: 1
     lookback_days: 252
@@ -223,7 +223,7 @@ strategies:
     coint_pvalue: 0.1
     type: stat_arb
   sector_rotation:
-    enabled: true
+    enabled: false
     lookback_months: 6
     rebalance_day: 1
     top_n: 3
@@ -231,7 +231,6 @@ strategies:
     safe_asset: SHY
     safe_asset_exchange: NYS
     sectors:
-      # 미국 섹터 ETF (SPDR Select Sector)
       - code: XLK
         market: US
         exchange: NYS
@@ -260,7 +259,6 @@ strategies:
         market: US
         exchange: NYS
         name: 커뮤니케이션
-      # 한국 섹터 ETF (KODEX)
       - code: '091160'
         market: KR
         name: 반도체
