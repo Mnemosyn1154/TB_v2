@@ -25,6 +25,7 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "quant_factor": QuantFactorStrategy,
     "sector_rotation": SectorRotationStrategy,
     "volatility_breakout": VolatilityBreakoutStrategy,
+    "bollinger_band": BollingerBandStrategy,
 }
 ```
 
@@ -211,6 +212,34 @@ class TradeSignal:
 **유니버스**: KR 블루칩 5종목 — 삼성전자, SK하이닉스, 현대차, NAVER, 셀트리온
 
 **입력 형식**: `generate_signals(ohlc_data={"005930": DataFrame}, current_prices={"005930": 54000})`
+
+---
+
+### bollinger_band.py — 볼린저 밴드 평균회귀
+
+**상태**: `enabled: true`
+
+**알고리즘**:
+1. SMA(N) 계산 (N일 이동평균)
+2. 상단 밴드 = SMA + K × σ(N), 하단 밴드 = SMA - K × σ(N)
+3. 종가 < 하단 밴드 → BUY (과매도 → 반등 기대)
+4. 종가 > 상단 밴드 → CLOSE (과매수 → 차익 실현)
+5. %B, Bandwidth를 metadata에 포함
+
+**특이사항**:
+- `on_trade_executed()` 콜백으로 `current_holdings` 상태 동기화
+- 종목당 최대 보유 1개 (`max_hold_per_stock`)
+
+| 파라미터 | 설정키 | 기본값 | 설명 |
+|----------|--------|--------|------|
+| SMA 기간 | `window` | 20 | 이동평균 윈도우 |
+| 표준편차 배수 | `num_std` | 2.0 | 밴드 폭 계수 |
+| 시장 | `market` | "KR" | 기본 시장 |
+| 종목당 최대 보유 | `max_hold_per_stock` | 1 | 동일 종목 중복 진입 방지 |
+
+**유니버스**: KR 블루칩 3종목 — 삼성전자, SK하이닉스, NAVER
+
+**입력 형식**: `generate_signals(price_data={"005930": Series, "000660": Series, ...})`
 
 ---
 

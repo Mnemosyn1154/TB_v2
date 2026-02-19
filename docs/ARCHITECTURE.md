@@ -170,6 +170,7 @@ STRATEGY_REGISTRY = {
     "quant_factor": QuantFactorStrategy,
     "sector_rotation": SectorRotationStrategy,
     "volatility_breakout": VolatilityBreakoutStrategy,
+    "bollinger_band": BollingerBandStrategy,
 }
 
 def resolve_strategy(config_key: str, strat_config: dict) -> BaseStrategy:
@@ -200,6 +201,7 @@ strategies:                   # 전략별 파라미터
   quant_factor:               # 팩터 가중치, 유니버스, top_n
   sector_rotation:            # 섹터 ETF 로테이션, 모멘텀 기반
   volatility_breakout:        # 래리 윌리엄스 변동성 돌파, OHLC 기반
+  bollinger_band:             # 볼린저 밴드 평균회귀, SMA ± K×σ
 
 risk:                         # 리스크 관리
   max_position_pct, stop_loss_pct, daily_loss_limit_pct,
@@ -229,7 +231,11 @@ backtest:                     # 초기 자본, 수수료율, 세율, 슬리피�
 
 - **Cloudflare Pages**: Next.js 빌드 호스팅 (`.github/workflows/deploy.yml`)
 - **Cloudflare Tunnel**: Python API를 인터넷에 안전하게 노출 (`deploy/cloudflared/`)
-- **systemd 서비스**: `deploy/systemd/`
+- **systemd 서비스** (Linux): `deploy/systemd/`
   - `d2trader-pyapi.service` — FastAPI 프로세스
   - `d2trader-tunnel.service` — Cloudflare Tunnel 프로세스
-- **배포 스크립트**: `deploy/deploy.sh` — 자동화된 배포 절차
+- **launchd 서비스** (macOS): `deploy/launchd/`
+  - `com.d2trader.pyapi.plist` — FastAPI 프로세스
+  - `com.d2trader.nextjs.plist` — Next.js 프로세스
+  - `com.d2trader.tunnel.plist` — Cloudflare Tunnel 프로세스
+- **배포 스크립트**: `deploy/deploy.sh` — macOS/Linux 자동 감지 배포

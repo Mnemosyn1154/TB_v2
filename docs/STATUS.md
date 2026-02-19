@@ -25,7 +25,7 @@
 - Python API 6개 라우터 (portfolio, backtest, bot, signals, paper, benchmark)
 - 웹 대시보드 6탭 전체 구현 및 백엔드 연동
 - KIS API 통합 (실매매 + 모의투자)
-- 백테스트 엔진 (5개 전략, yfinance 기반, inf/NaN 안전 직렬화, OHLC 전략 지원)
+- 백테스트 엔진 (6개 전략, yfinance 기반, inf/NaN 안전 직렬화, OHLC 전략 지원)
   - 백테스트 모드에서 MDD/킬스위치/일일손실 체크 자동 비활성화
   - 거래 결과에 종목명 표시
   - 백테스트 실행 로그 (전략별 사람이 읽을 수 있는 요약)
@@ -42,9 +42,12 @@
 - 장 운영시간 체크 (KR/US), 데이터 신선도 경고
 - APScheduler 15분 주기 자동 실행 (장중에만 실행, 킬스위치 연동)
   - 대시보드에서 스케줄러 on/off 토글, 다음 실행/마지막 실행 상태 표시
-- 테스트: 85 tests (시뮬레이션 E2E 13개 + 전략 유닛 72개)
+- 전략 카드 드래그 앤 드롭 순서 변경
+- 테스트: 94 tests (시뮬레이션 E2E 13개 + 전략 유닛 81개)
 - 다크 모드 (기본값)
 - Cloudflare Pages + Tunnel 배포 파이프라인
+- macOS launchd 배포 지원 (deploy/launchd/)
+- KIS 실전 거래 연동 사전 작업 (모드 전환, KIS 상태 조회, 주문 내역)
 
 ## 미완성 / 제한사항
 
@@ -63,11 +66,37 @@
 | dual_momentum | `dual_momentum` | ENABLED | KR(069500)/US(SPY) ETF, 월 1일 리밸런싱 |
 | quant_factor | `quant_factor` | ENABLED | 멀티팩터 스코어링 + 절대 모멘텀 필터, KR 20 + US 14 유니버스 |
 | volatility_breakout | `volatility_breakout` | ENABLED | 래리 윌리엄스 변동성 돌파, KR 5종목, k=0.8 |
+| bollinger_band | `bollinger_band` | ENABLED | 볼린저 밴드 평균회귀, KR 3종목, window=20, num_std=2 |
 | stat_arb | `stat_arb` | DISABLED | 4 US 페어 (KO_PEP, XOM_CVX, V_MA, MSFT_GOOGL), coint_pvalue=0.1 |
 | sector_rotation | `sector_rotation` | DISABLED | US 7섹터 + KR 2섹터 ETF, top_n=3, 6개월 룩백 |
-| sam_hynix | `sam_hynix` | DISABLED | stat_arb 타입, 삼성전자/SK하이닉스 KR 페어 |
 
 ## 최근 주요 변경
+
+### 2026-02-19: KIS 실전 거래 연동 사전 작업 (PR #22)
+
+- 모드 전환 API (`/py/bot/mode` GET/POST) — 시뮬레이션 ↔ 실거래 전환
+- KIS 상태 조회 API (`/py/bot/health/kis`) — 계좌/토큰/잔고 연결 상태
+- 주문 내역 조회 API (`/py/bot/orders`) — 당일 체결 내역
+- YAML 순서 보존 (ruamel.yaml 사용), 모드 헬퍼 추출, KIS 동기화 개선
+
+### 2026-02-19: 전략 카드 드래그 앤 드롭 (PR #23)
+
+- `web/components/strategy/sortable-strategy-card.tsx` — @dnd-kit 기반 정렬
+- 전략 카드 순서를 드래그로 변경, settings.yaml에 저장
+
+### 2026-02-19: 볼린저 밴드 전략 (PR #21)
+
+- `src/strategies/bollinger_band.py` — 볼린저 밴드 평균회귀 전략
+  - 종가 < 하단 밴드 → 매수 (과매도), 종가 > 상단 밴드 → 청산 (과매수)
+  - SMA(N) ± K×σ(N), %B/Bandwidth metadata 포함
+- `config/settings.yaml` — `bollinger_band` 설정 (window=20, num_std=2, KR 3종목)
+- `tests/test_strategies.py` — BollingerBand 유닛 테스트 9개 추가
+- sam_hynix 전략 인스턴스 제거, bollinger_band 활성화
+
+### 2026-02-19: macOS launchd 배포 (PR #18)
+
+- `deploy/launchd/` — macOS용 launchd plist 파일 3개 (pyapi, nextjs, tunnel)
+- `deploy/deploy.sh` — macOS/Linux 자동 감지 배포 스크립트
 
 ### 2026-02-19: 백테스트 안정화
 
@@ -107,7 +136,7 @@
 2. **Phase 2 — 페이퍼 트레이딩 & 데이터 신뢰성** (`95e4937`): 세션 잔고 추적, 장 운영시간 체크, 데이터 신선도 경고
 3. **Phase 3 — 대시보드 UX 개선** (`3984203`): 캐시 무효화, 토스트 에러 알림, 벤치마크 포트폴리오 시계열 연동
 4. **Phase 4 — 안정성 & 테스트** (`e637900`): DB 트랜잭션, 시뮬레이션 E2E 테스트 13건, 전략 유닛 테스트 36건
-5. **전략 설정 확장**: stat_arb 4페어(KO_PEP, XOM_CVX, V_MA, MSFT_GOOGL), sector_rotation 신규, quant_factor 유니버스 34종목, sam_hynix KR 페어 인스턴스
+5. **전략 설정 확장**: stat_arb 4페어(KO_PEP, XOM_CVX, V_MA, MSFT_GOOGL), sector_rotation 신규, quant_factor 유니버스 34종목
 
 상세: `docs/SIMULATION_ISSUES.md` 참조
 

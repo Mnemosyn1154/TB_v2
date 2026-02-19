@@ -69,13 +69,13 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ## 프로젝트 개요
 
 D2trader — 한국/미국 주식 알고리즘 트레이딩 대시보드.
-KIS Open API(한국투자증권)를 통해 5개 전략(stat_arb, dual_momentum, quant_factor, sector_rotation, volatility_breakout)을 자동 매매하며,
+KIS Open API(한국투자증권)를 통해 6개 전략(stat_arb, dual_momentum, quant_factor, sector_rotation, volatility_breakout, bollinger_band)을 자동 매매하며,
 Next.js 웹 대시보드에서 포트폴리오 모니터링, 백테스트, 페이퍼 트레이딩, 봇 제어를 수행한다.
 
 - **백엔드**: Python 3.12 + FastAPI (pyapi/) + 코어 엔진 (src/)
 - **프론트엔드**: Next.js 16 + React 19 + TypeScript 5.9 + Tailwind 4 + shadcn/ui
 - **DB**: SQLite (data/trading_bot.db)
-- **배포**: Cloudflare Pages + Tunnel, systemd, GitHub Actions
+- **배포**: Cloudflare Pages + Tunnel, systemd/launchd, GitHub Actions
 
 ## 아키텍처
 
@@ -102,7 +102,7 @@ TB_v2/
 ├── config/settings.yaml     # 전략/리스크/브로커 설정 (YAML)
 ├── src/                     # Python 코어 엔진
 │   ├── core/                # KIS 브로커, 설정 로더, DB, 리스크 관리
-│   ├── strategies/          # 5개 전략 (BaseStrategy 플러그인 시스템)
+│   ├── strategies/          # 6개 전략 (BaseStrategy 플러그인 시스템)
 │   ├── execution/           # 데이터 수집 + 주문 실행
 │   ├── backtest/            # 백테스트 엔진 + 성과 분석
 │   └── utils/               # 로거(loguru), 텔레그램 알림
@@ -123,10 +123,10 @@ TB_v2/
 ├── tests/                   # pytest 테스트
 │   ├── conftest.py          # 공통 fixture (in-memory SQLite tracker)
 │   ├── test_simulation_e2e.py  # 시뮬레이션 E2E (매수/매도/P&L/스냅샷)
-│   └── test_strategies.py   # 전략 유닛 테스트 (StatArb/DualMomentum/QuantFactor/VolatilityBreakout)
+│   └── test_strategies.py   # 전략 유닛 테스트 (StatArb/DualMomentum/QuantFactor/VolatilityBreakout/BollingerBand)
 ├── dashboard/               # Streamlit 레거시 UI
 │   └── services/            # 비즈니스 로직 (일부 pyapi에서 import)
-├── deploy/                  # systemd 서비스, Cloudflare Tunnel, deploy.sh
+├── deploy/                  # systemd/launchd 서비스, Cloudflare Tunnel, deploy.sh
 └── docs/                    # 문서 (ARCHITECTURE, API_REFERENCE, 등)
 ```
 
@@ -193,12 +193,14 @@ python3 main.py backtest-yf -s stat_arb --start 2020-01-01 --end 2024-12-31
 - **시뮬레이션 모드**: SQLite 기반 가상 포트폴리오 (기본 ON, `simulation.enabled` 토글)
   - 실주문 차단 가드, DB 트랜잭션, 포지션 가격 갱신, 스냅샷 기록
 - **Python 3.12**: pyenv로 3.12.12 사용 (`.python-version`), 3.10+ 타입 문법 지원
-- **활성 전략** (settings.yaml `enabled: true`): dual_momentum, quant_factor, volatility_breakout
-- **비활성 전략**: stat_arb, sector_rotation, sam_hynix (각 `enabled: false`)
+- **활성 전략** (settings.yaml `enabled: true`): dual_momentum, quant_factor, volatility_breakout, bollinger_band
+- **비활성 전략**: stat_arb, sector_rotation (각 `enabled: false`)
 - **백테스트 리스크**: 백테스트 모드에서 MDD/킬스위치/일일손실 체크 자동 비활성화
-- **테스트**: 85 tests 통과 (`python -m pytest tests/`)
+- **테스트**: 94 tests 통과 (`python -m pytest tests/`)
   - `tests/test_simulation_e2e.py` — PortfolioTracker E2E (13 tests)
-  - `tests/test_strategies.py` — StatArb/DualMomentum/QuantFactor/AbsMomentum/SectorRotation/VolatilityBreakout 유닛 (72 tests)
+  - `tests/test_strategies.py` — StatArb/DualMomentum/QuantFactor/AbsMomentum/SectorRotation/VolatilityBreakout/BollingerBand 유닛 (81 tests)
+- **KIS 실전 거래 연동**: 모드 전환, KIS 상태 조회, 주문 내역 API 구현
+- **전략 카드 드래그 앤 드롭**: @dnd-kit 기반 순서 변경
 - **Settings API**: Python API 없이 Next.js에서 settings.yaml 직접 읽기/쓰기
 - **전략 편집**: StrategyEditor에서 숫자/문자열 파라미터, pairs, universe_codes 편집 가능
 - **백테스트**: inf/NaN 안전 직렬화, 사람이 읽을 수 있는 실행 로그 제공
@@ -218,4 +220,6 @@ python3 main.py backtest-yf -s stat_arb --start 2020-01-01 --end 2024-12-31
 | `docs/TEST_PLAN.md` | 테스트 전략 및 케이스 |
 | `docs/SIMULATION_ISSUES.md` | 시뮬레이션 이슈 분석 & 수정 이력 (Phase 1-4 완료) |
 | `docs/DESIGN_SYSTEM.md` | 디자인 토큰, 색상, 타이포그래피 |
+| `docs/USER_MANUAL.md` | 사용자 매뉴얼 (대시보드 사용법, 전략 소개) |
+| `docs/REFACTORING_ANALYSIS.md` | 코드베이스 리팩토링 분석 |
 | `src/*/README.md` | 모듈별 문서 (5개 파일) |

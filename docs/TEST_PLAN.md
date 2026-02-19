@@ -4,7 +4,7 @@
 > 작성일: 2026-02-18
 >
 > **현재 구현 상태 (2026-02-19)**:
-> - Python 테스트: 85 tests 통과 (시뮬레이션 E2E 13개 + 전략 유닛 72개)
+> - Python 테스트: 94 tests 통과 (시뮬레이션 E2E 13개 + 전략 유닛 81개)
 > - 테스트 위치: `tests/test_simulation_e2e.py`, `tests/test_strategies.py`
 > - 프론트엔드 테스트: 미구현 (Vitest 미설정)
 > - API 라우터 테스트: 미구현 (아래 계획 중 `tests/api/` 부분 미시작)
