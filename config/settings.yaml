@@ -71,6 +71,10 @@ strategies:
       value: 0.3
       quality: 0.3
       momentum: 0.4
+    absolute_momentum_filter: true
+    abs_mom_threshold: 0.0
+    safe_asset: SHY
+    safe_asset_exchange: NYS
     universe_codes:
       - code: '005930'
         market: KR
