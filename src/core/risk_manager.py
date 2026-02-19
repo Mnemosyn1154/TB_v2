@@ -2,7 +2,7 @@
 AlgoTrader KR — 리스크 매니저
 
 포지션/포트폴리오 레벨 리스크 관리 엔진.
-can_open_position() 체크 순서: Kill Switch → 일일 손실 → MDD → 포지션 수 → 종목 비중 → 현금 비중
+can_open_position() 체크 순서: Kill Switch → 일일 손실 → MDD → 포지션 수 → 종목 비중 → 현금 비중 → 전략별 자본 한도
 
 Depends on:
     - src.core.config (리스크 한도 설정)
@@ -15,6 +15,7 @@ Modification Guide:
     - 새 리스크 체크 추가: can_open_position()에 조건 추가 + settings.yaml에 파라미터 추가
     - Kill Switch는 반드시 첫 번째 체크로 유지
     - Position/RiskState는 dataclass — 필드 추가 시 기본값 필수
+    - 전략별 자본 할당: strategy_allocation 설정으로 전략별 자본 한도 관리
 """
 import json
 from dataclasses import dataclass, field
@@ -95,18 +96,44 @@ class RiskManager:
         self.max_positions = risk_config["max_positions"]
         self.min_cash_pct = risk_config["min_cash_pct"]
 
+        # 전략별 자본 할당 (없으면 빈 dict → 기존 동작 유지)
+        self.strategy_allocation: dict[str, float] = risk_config.get("strategy_allocation", {}) or {}
+
         self.state = RiskState()
         self._kill_switch = self._load_kill_switch()
 
+        alloc_msg = ""
+        if self.strategy_allocation:
+            parts = [f"{k}={v*100:.0f}%" for k, v in self.strategy_allocation.items()]
+            alloc_msg = f", 전략할당=[{', '.join(parts)}]"
         logger.info(f"RiskManager 초기화: 손절={self.stop_loss_pct}%, "
                     f"일일한도={self.daily_loss_limit_pct}%, "
-                    f"MDD={self.max_drawdown_pct}%")
+                    f"MDD={self.max_drawdown_pct}%{alloc_msg}")
+
+    # ──────────────────────────────────────────────
+    # 전략별 자본 할당 헬퍼
+    # ──────────────────────────────────────────────
+
+    def _get_strategy_budget(self, strategy: str) -> float | None:
+        """전략에 할당된 총 자본 한도를 반환. 할당 설정이 없으면 None."""
+        if not self.strategy_allocation or not strategy:
+            return None
+        pct = self.strategy_allocation.get(strategy)
+        if pct is None:
+            return None
+        total = self.state.total_equity + self.state.cash
+        return total * pct
+
+    def _get_strategy_used(self, strategy: str) -> float:
+        """해당 전략이 현재 사용 중인 금액 (포지션 평가금 합계)"""
+        return sum(p.market_value for p in self.state.positions if p.strategy == strategy)
 
     # ──────────────────────────────────────────────
     # 주문 전 검증
     # ──────────────────────────────────────────────
 
-    def can_open_position(self, code: str, market_value: float) -> tuple[bool, str]:
+    def can_open_position(self, code: str, market_value: float,
+                          strategy: str = "") -> tuple[bool, str]:
         """새 포지션 오픈 가능 여부 검증"""
         # Kill switch 체크
         if self._kill_switch:
@@ -139,6 +166,18 @@ class RiskManager:
             new_cash_pct = (remaining_cash / total) * 100
             if new_cash_pct < self.min_cash_pct:
                 return False, f"최소 현금 비중 미달: {new_cash_pct:.1f}% < {self.min_cash_pct}%"
+
+        # 전략별 자본 한도 체크
+        budget = self._get_strategy_budget(strategy)
+        if budget is not None:
+            used = self._get_strategy_used(strategy)
+            if used + market_value > budget:
+                remaining = max(budget - used, 0)
+                return False, (
+                    f"전략 자본 한도 초과 ({strategy}): "
+                    f"사용 {used:,.0f} + 신규 {market_value:,.0f} > 한도 {budget:,.0f} "
+                    f"(잔여 {remaining:,.0f})"
+                )
 
         return True, "OK"
 
@@ -231,8 +270,9 @@ class RiskManager:
     # 포지션 사이징
     # ──────────────────────────────────────────────
 
-    def calculate_position_size(self, price: float, market: str = "KR") -> int:
-        """적정 포지션 사이즈 계산 (동일 비중 기반)"""
+    def calculate_position_size(self, price: float, market: str = "KR",
+                                strategy: str = "") -> int:
+        """적정 포지션 사이즈 계산 (동일 비중 기반, 전략별 자본 한도 반영)"""
         total = self.state.total_equity + self.state.cash
         if total == 0:
             # fallback: settings의 initial_capital 사용
@@ -248,13 +288,21 @@ class RiskManager:
 
         # 최대 비중의 80%로 보수적 사이징
         target_value = total * (self.max_position_pct / 100) * 0.8
+
+        # 전략별 자본 한도가 있으면 잔여 한도 이내로 제한
+        budget = self._get_strategy_budget(strategy)
+        if budget is not None:
+            remaining = max(budget - self._get_strategy_used(strategy), 0)
+            if target_value > remaining:
+                target_value = remaining
+
         quantity = int(target_value / price)
 
         return max(quantity, 0)
 
     def get_risk_summary(self) -> dict[str, Any]:
         """리스크 요약 리포트"""
-        return {
+        summary: dict[str, Any] = {
             "total_equity": self.state.total_equity,
             "cash": self.state.cash,
             "cash_pct": f"{self.state.cash_pct:.1f}%",
@@ -273,3 +321,20 @@ class RiskManager:
                 for p in self.state.positions
             ],
         }
+
+        # 전략별 자본 할당 현황
+        if self.strategy_allocation:
+            total = self.state.total_equity + self.state.cash
+            alloc_info: dict[str, Any] = {}
+            for name, pct in self.strategy_allocation.items():
+                budget = total * pct
+                used = self._get_strategy_used(name)
+                used_pct = (used / total * 100) if total > 0 else 0.0
+                alloc_info[name] = {
+                    "allocated_pct": pct * 100,
+                    "used_pct": round(used_pct, 1),
+                    "remaining": round(max(budget - used, 0)),
+                }
+            summary["strategy_allocation"] = alloc_info
+
+        return summary

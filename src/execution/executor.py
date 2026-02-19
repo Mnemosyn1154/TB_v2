@@ -121,7 +121,7 @@ class OrderExecutor:
 
         # 2. 수량 결정
         quantity = signal.quantity or self.risk_manager.calculate_position_size(
-            price, signal.market
+            price, signal.market, signal.strategy
         )
         if quantity <= 0:
             logger.warning(f"포지션 사이즈 0, 매수 스킵: {signal.code}")
@@ -131,7 +131,7 @@ class OrderExecutor:
 
         # 3. 리스크 검증
         can_trade, reason = self.risk_manager.can_open_position(
-            signal.code, market_value
+            signal.code, market_value, signal.strategy
         )
         if not can_trade:
             logger.warning(f"리스크 거부: {reason}")
