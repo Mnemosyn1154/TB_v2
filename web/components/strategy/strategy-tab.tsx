@@ -1,13 +1,10 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { useApi } from "@/hooks/use-api";
 import { getSettings, updateSettings } from "@/lib/api-client";
-import { snakeToTitle } from "@/lib/strategy-utils";
-import { StrategyList } from "./strategy-list";
-import { StrategyEditor } from "./strategy-editor";
-import { UniverseViewer } from "./universe-viewer";
+import { StrategyCard } from "./strategy-card";
 import { StrategyCreateDialog } from "./strategy-create-dialog";
 import type { ApiResponse } from "@/types/common";
 
@@ -16,24 +13,12 @@ interface SettingsData {
   [key: string]: unknown;
 }
 
-/** Detect what kind of universe data exists and return a section label */
-function universeLabel(config: Record<string, unknown>): string | null {
-  if (Array.isArray(config.pairs) && config.pairs.length > 0)
-    return "페어 유니버스";
-  if (Array.isArray(config.universe_codes) && config.universe_codes.length > 0)
-    return "종목 유니버스";
-  if (Object.keys(config).some((k) => k.includes("etf")))
-    return "ETF 목록";
-  return null;
-}
-
 export function StrategyTab() {
   const fetcher = useCallback(
     () => getSettings() as Promise<ApiResponse<SettingsData>>,
     []
   );
   const { data, error, loading, refetch } = useApi<SettingsData>(fetcher);
-  const [editingKey, setEditingKey] = useState<string | null>(null);
 
   async function handleToggle(key: string) {
     try {
@@ -53,7 +38,6 @@ export function StrategyTab() {
       strategies: { ...data.strategies, [key]: updated },
     };
     await updateSettings(newData);
-    setEditingKey(null);
     refetch();
   }
 
@@ -89,35 +73,18 @@ export function StrategyTab() {
         <StrategyCreateDialog onCreated={refetch} />
       </div>
 
-      <StrategyList
-        strategies={strategies}
-        onToggle={handleToggle}
-        onEdit={setEditingKey}
-        onDelete={handleDelete}
-      />
-
-      {/* 유니버스 뷰어 - 각 전략별 */}
-      {Object.entries(strategies).map(([key, config]) => {
-        const enabled = config.enabled as boolean;
-        if (!enabled) return null;
-        const label = universeLabel(config);
-        if (!label) return null;
-        return (
-          <section key={key}>
-            <h3 className="mb-3 text-sm font-semibold text-muted-foreground">
-              {snakeToTitle(key)} — {label}
-            </h3>
-            <UniverseViewer strategyKey={key} config={config} />
-          </section>
-        );
-      })}
-
-      <StrategyEditor
-        strategyKey={editingKey}
-        config={editingKey ? strategies[editingKey] ?? null : null}
-        onSave={handleSave}
-        onClose={() => setEditingKey(null)}
-      />
+      <div className="flex flex-col gap-4">
+        {Object.entries(strategies).map(([key, config]) => (
+          <StrategyCard
+            key={key}
+            strategyKey={key}
+            config={config}
+            onToggle={handleToggle}
+            onSave={handleSave}
+            onDelete={handleDelete}
+          />
+        ))}
+      </div>
     </div>
   );
 }
