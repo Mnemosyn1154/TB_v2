@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+============================================================
+D2trader Python API — launchd plist (macOS)
+============================================================
+
+설치:
+  # 플레이스홀더 치환 후 LaunchAgents에 복사 (deploy.sh setup 권장)
+  sed -e 's|<USER>|'"$USER"'|g' -e 's|<PROJECT_DIR>|/path/to/TB_v2|g' \
+    deploy/launchd/com.d2trader.pyapi.plist \
+    > ~/Library/LaunchAgents/com.d2trader.pyapi.plist
+  launchctl load ~/Library/LaunchAgents/com.d2trader.pyapi.plist
+
+로그 확인:
+  tail -f ~/Library/Logs/d2trader/pyapi.stdout.log
+  tail -f ~/Library/Logs/d2trader/pyapi.stderr.log
+
+환경변수 (.env 파일 로딩):
+  launchd는 EnvironmentVariables 키만 지원하며 EnvironmentFile은 없다.
+  아래 두 가지 방법 중 하나를 선택:
+
+  방법 A (권장): ExecStart를 wrapper script로 교체
+    ExecStart 키의 값을 <PROJECT_DIR>/deploy/launchd/start-pyapi.sh 로 바꾸고
+    스크립트에서 "source <PROJECT_DIR>/.env && uvicorn ..." 실행.
+
+  방법 B: EnvironmentVariables에 직접 나열
+    아래 주석 처리된 <key>EnvironmentVariables</key> 블록을 해제하고
+    각 변수를 직접 입력. 시크릿이 plist에 평문 노출되므로 주의.
+
+============================================================
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.d2trader.pyapi</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string><PROJECT_DIR>/.venv/bin/uvicorn</string>
+    <string>pyapi.main:app</string>
+    <string>--host</string>
+    <string>127.0.0.1</string>
+    <string>--port</string>
+    <string>8000</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string><PROJECT_DIR></string>
+
+  <!--
+  방법 B: 환경변수 직접 나열 (방법 A 사용 시 이 블록 삭제)
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PYTHON_API_SECRET</key>
+    <string>your-secret-here</string>
+    <key>KIS_APP_KEY</key>
+    <string>your-app-key</string>
+    <key>KIS_APP_SECRET</key>
+    <string>your-app-secret</string>
+  </dict>
+  -->
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
+
+  <key>StandardOutPath</key>
+  <string>/Users/<USER>/Library/Logs/d2trader/pyapi.stdout.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/<USER>/Library/Logs/d2trader/pyapi.stderr.log</string>
+</dict>
+</plist>
