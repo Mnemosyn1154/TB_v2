@@ -108,6 +108,70 @@ def get_benchmark_data(
     return {"data": result, "error": None}
 
 
+@router.get("/benchmark/data-range")
+def get_benchmark_data_range(
+    start: str = Query(..., description="시작일 YYYY-MM-DD"),
+    end: str = Query(..., description="종료일 YYYY-MM-DD"),
+    secret: None = Depends(verify_secret),
+):
+    """임의 날짜 범위의 벤치마크 인덱스 가격 데이터 (백테스트 피어 비교용)"""
+    import pandas as pd
+    from loguru import logger
+    from sqlalchemy import text
+
+    from src.backtest.runner import get_db_engine, save_prices_to_db
+
+    engine = get_db_engine()
+
+    result = {}
+    for key, info in INDEX_SYMBOLS.items():
+        code = info["code"]
+        market = info["market"]
+
+        # 1. DB 캐시 조회
+        try:
+            df = pd.read_sql(
+                text("""
+                    SELECT date, close FROM daily_prices
+                    WHERE code = :code AND market = :market
+                      AND date >= :start AND date <= :end
+                    ORDER BY date ASC
+                """),
+                engine,
+                params={"code": code, "market": market, "start": start, "end": end},
+            )
+        except Exception:
+            df = pd.DataFrame()
+
+        # 2. DB 데이터 부족 시 yfinance로 보충
+        if df.empty or len(df) < 10:
+            try:
+                from src.core.data_feed import DataFeed
+
+                feed = DataFeed()
+                yf_df = feed.fetch(code, start, end, market="US")
+                if not yf_df.empty:
+                    yf_df["market"] = market
+                    save_prices_to_db(yf_df)
+                    logger.info(f"벤치마크 DB 캐시: {code} — {len(yf_df)}건")
+                    df = yf_df[["date", "close"]].copy()
+                    df["date"] = df["date"].dt.strftime("%Y-%m-%d")
+            except Exception as e:
+                logger.warning(f"벤치마크 yfinance 실패: {code} — {e}")
+
+        if not df.empty:
+            if hasattr(df["date"].iloc[0], "strftime"):
+                df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
+            result[key] = {
+                "dates": df["date"].tolist(),
+                "prices": df["close"].tolist(),
+            }
+        else:
+            result[key] = {"dates": [], "prices": []}
+
+    return {"data": result, "error": None}
+
+
 @router.get("/benchmark/portfolio-series")
 def get_portfolio_series(
     period: str = Query("3M"),

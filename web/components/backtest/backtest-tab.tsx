@@ -12,6 +12,7 @@ import { MonthlyHeatmap } from "./monthly-heatmap";
 import { PnlDistribution } from "./pnl-distribution";
 import { TradeTable } from "./trade-table";
 import { BacktestLogs } from "./backtest-logs";
+import { PeerComparison } from "./peer-comparison";
 import type { ApiResponse } from "@/types/common";
 
 interface SettingsData {
@@ -20,7 +21,7 @@ interface SettingsData {
 }
 
 export function BacktestTab() {
-  const { result, error, loading, run } = useBacktest();
+  const { result, lastParams, error, loading, run } = useBacktest();
   const settingsFetcher = useCallback(
     () => getSettings() as Promise<ApiResponse<SettingsData>>,
     []
@@ -67,6 +68,14 @@ export function BacktestTab() {
             />
             <PnlDistribution pnlValues={result.pnl_values} />
           </div>
+
+          {lastParams && (
+            <PeerComparison
+              startDate={lastParams.start_date}
+              endDate={lastParams.end_date}
+              equityCurve={result.equity_curve}
+            />
+          )}
 
           <TradeTable trades={result.trades} />
 
