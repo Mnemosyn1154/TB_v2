@@ -10,16 +10,19 @@ AlgoTrader KR — Strategies 패키지
     - StatArbStrategy: 통계적 차익거래 (공적분 기반)
     - DualMomentumStrategy: 듀얼 모멘텀 (상대+절대)
     - QuantFactorStrategy: 퀀트 팩터 (멀티팩터 스코어링)
+    - SectorRotationStrategy: 섹터 로테이션 (모멘텀 기반 섹터 ETF 순환)
 """
 from src.strategies.base import BaseStrategy, TradeSignal, Signal
 from src.strategies.stat_arb import StatArbStrategy
 from src.strategies.dual_momentum import DualMomentumStrategy
 from src.strategies.quant_factor import QuantFactorStrategy
+from src.strategies.sector_rotation import SectorRotationStrategy
 
 STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "stat_arb": StatArbStrategy,
     "dual_momentum": DualMomentumStrategy,
     "quant_factor": QuantFactorStrategy,
+    "sector_rotation": SectorRotationStrategy,
 }
 
 
@@ -43,6 +46,7 @@ __all__ = [
     "StatArbStrategy",
     "DualMomentumStrategy",
     "QuantFactorStrategy",
+    "SectorRotationStrategy",
     "STRATEGY_REGISTRY",
     "resolve_strategy",
 ]

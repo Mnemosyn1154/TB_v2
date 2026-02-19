@@ -10,7 +10,6 @@ strategies:
   stat_arb:
     enabled: true
     pairs:
-      # 1순위: KO/PEP — 가장 클래식한 pairs trade (Consumer Staples)
       - name: KO_PEP
         market: US
         stock_a: KO
@@ -19,7 +18,6 @@ strategies:
         exchange_a: NYS
         exchange_b: NAS
         exchange_hedge: NYS
-      # 2순위: XOM/CVX — 석유 메이저 (동일 유가 노출)
       - name: XOM_CVX
         market: US
         stock_a: XOM
@@ -28,7 +26,6 @@ strategies:
         exchange_a: NYS
         exchange_b: NYS
         exchange_hedge: NYS
-      # 3순위: V/MA — 결제 네트워크 듀오폴리
       - name: V_MA
         market: US
         stock_a: V
@@ -37,7 +34,6 @@ strategies:
         exchange_a: NYS
         exchange_b: NYS
         exchange_hedge: NYS
-      # 비교용: 기존 MSFT/GOOGL (공적분 안 나올 가능성 높음)
       - name: MSFT_GOOGL
         market: US
         stock_a: MSFT
@@ -49,9 +45,9 @@ strategies:
     lookback_window: 90
     entry_z_score: 1.5
     exit_z_score: 0.5
-    stop_loss_z_score: 3.0
+    stop_loss_z_score: 3
     recalc_beta_days: 20
-    coint_pvalue: 0.10
+    coint_pvalue: 0.1
   dual_momentum:
     enabled: true
     lookback_months: 12
@@ -222,10 +218,58 @@ strategies:
     lookback_window: 90
     entry_z_score: 1.5
     exit_z_score: 0.5
-    stop_loss_z_score: 3.0
+    stop_loss_z_score: 3
     recalc_beta_days: 20
-    coint_pvalue: 0.10
+    coint_pvalue: 0.1
     type: stat_arb
+  sector_rotation:
+    enabled: true
+    lookback_months: 6
+    rebalance_day: 1
+    top_n: 3
+    risk_free_rate: 0.04
+    safe_asset: SHY
+    safe_asset_exchange: NYS
+    sectors:
+      # 미국 섹터 ETF (SPDR Select Sector)
+      - code: XLK
+        market: US
+        exchange: NYS
+        name: 기술
+      - code: XLF
+        market: US
+        exchange: NYS
+        name: 금융
+      - code: XLE
+        market: US
+        exchange: NYS
+        name: 에너지
+      - code: XLV
+        market: US
+        exchange: NYS
+        name: 헬스케어
+      - code: XLY
+        market: US
+        exchange: NYS
+        name: 소비재
+      - code: XLI
+        market: US
+        exchange: NYS
+        name: 산업
+      - code: XLC
+        market: US
+        exchange: NYS
+        name: 커뮤니케이션
+      # 한국 섹터 ETF (KODEX)
+      - code: '091160'
+        market: KR
+        name: 반도체
+      - code: '266360'
+        market: KR
+        name: 2차전지
+      - code: '091170'
+        market: KR
+        name: 은행
 risk:
   max_position_pct: 10
   stop_loss_pct: -7
