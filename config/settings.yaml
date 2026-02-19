@@ -272,6 +272,30 @@ strategies:
       - code: '091170'
         market: KR
         name: 은행
+  volatility_breakout:
+    enabled: false
+    k: 0.5
+    market: KR
+    max_hold_per_stock: 1
+    close_at_market_end: true
+    kr_close_time: '15:15'
+    us_close_time: '15:45'
+    universe_codes:
+      - code: '005930'
+        market: KR
+        name: 삼성전자
+      - code: '000660'
+        market: KR
+        name: SK하이닉스
+      - code: '005380'
+        market: KR
+        name: 현대차
+      - code: '035420'
+        market: KR
+        name: NAVER
+      - code: '068270'
+        market: KR
+        name: 셀트리온
 risk:
   max_position_pct: 10
   stop_loss_pct: -7

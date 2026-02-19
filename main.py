@@ -108,13 +108,15 @@ class AlgoTrader:
 
     def _run_strategy(self, strategy: BaseStrategy) -> list:
         """전략 1개 실행: DB에서 데이터 로드 → prepare → generate_signals"""
+        use_ohlc = getattr(strategy, "needs_ohlc", False)
+
         price_data = {}
         for item in strategy.required_codes():
             code = item["code"]
             market = item["market"]
             df = self.data_manager.load_daily_prices(code, market)
             if not df.empty:
-                price_data[code] = df["close"]
+                price_data[code] = df if use_ohlc else df["close"]
 
         if not price_data:
             logger.warning(f"{strategy.name}: 데이터 부족")
@@ -123,6 +125,23 @@ class AlgoTrader:
         kwargs = strategy.prepare_signal_kwargs(price_data)
         if not kwargs:
             return []
+
+        # OHLC 전략: 장중 현재가 주입
+        if use_ohlc:
+            current_prices = {}
+            for item in strategy.required_codes():
+                code = item["code"]
+                market = item["market"]
+                try:
+                    if market == "KR":
+                        info = self.broker.get_kr_price(code)
+                    else:
+                        exchange = item.get("exchange", "NAS")
+                        info = self.broker.get_us_price(code, exchange)
+                    current_prices[code] = info["price"]
+                except Exception as e:
+                    logger.warning(f"현재가 조회 실패: {code} — {e}")
+            kwargs["current_prices"] = current_prices
 
         return strategy.generate_signals(**kwargs)
 
@@ -303,7 +322,7 @@ def main():
     # yfinance 백테스트 (독립 실행)
     bt_yf_parser = subparsers.add_parser("backtest-yf", help="백테스트 (yfinance 데이터, API 키 불필요)")
     bt_yf_parser.add_argument("-s", "--strategy", required=True,
-                              choices=["stat_arb", "dual_momentum", "quant_factor", "sector_rotation", "all"],
+                              choices=["stat_arb", "dual_momentum", "quant_factor", "sector_rotation", "volatility_breakout", "all"],
                               help="백테스트할 전략")
     bt_yf_parser.add_argument("--start", required=True,
                               help="시작일 (YYYY-MM-DD)")

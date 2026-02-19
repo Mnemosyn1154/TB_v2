@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""전략 유닛 테스트: StatArb, DualMomentum, QuantFactor"""
+"""전략 유닛 테스트: StatArb, DualMomentum, QuantFactor, VolatilityBreakout"""
 
 from unittest.mock import patch
 
@@ -500,3 +500,283 @@ class TestQuantFactorAbsoluteMomentum:
         signals = self.strategy.generate_signals(price_data=price_data)
         buy_codes = {s.code for s in signals if s.signal == Signal.BUY}
         assert "SHY" not in buy_codes
+
+
+# ──────────────────────────────────────────────
+# VolatilityBreakout
+# ──────────────────────────────────────────────
+
+VOLATILITY_BREAKOUT_CONFIG = {
+    "simulation": {"enabled": True, "initial_capital": 10_000_000},
+    "strategies": {
+        "volatility_breakout": {
+            "enabled": True,
+            "k": 0.5,
+            "market": "KR",
+            "max_hold_per_stock": 1,
+            "close_at_market_end": True,
+            "kr_close_time": "15:15",
+            "us_close_time": "15:45",
+            "universe_codes": [
+                {"code": "005930", "market": "KR", "name": "삼성전자"},
+                {"code": "000660", "market": "KR", "name": "SK하이닉스"},
+            ],
+        },
+    },
+}
+
+
+def _make_ohlc_df(n: int = 10, base: float = 50000, seed: int = 42) -> pd.DataFrame:
+    """OHLC DataFrame 생성 (변동성 돌파 테스트용)"""
+    rng = np.random.RandomState(seed)
+    dates = pd.bdate_range("2024-01-01", periods=n)
+    rows = []
+    price = base
+    for d in dates:
+        open_ = price + rng.randn() * 500
+        high = open_ + abs(rng.randn()) * 1000
+        low = open_ - abs(rng.randn()) * 1000
+        close = open_ + rng.randn() * 500
+        rows.append({"date": d.strftime("%Y-%m-%d"), "open": open_, "high": high,
+                      "low": low, "close": close})
+        price = close
+    return pd.DataFrame(rows)
+
+
+class TestVolatilityBreakout:
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        with patch("src.strategies.volatility_breakout.get_config",
+                    return_value=VOLATILITY_BREAKOUT_CONFIG):
+            from src.strategies.volatility_breakout import VolatilityBreakoutStrategy
+            self.strategy = VolatilityBreakoutStrategy()
+
+    def test_init(self):
+        assert self.strategy.k == 0.5
+        assert self.strategy.market == "KR"
+        assert len(self.strategy.universe) == 2
+        assert self.strategy.needs_ohlc is True
+
+    def test_required_codes(self):
+        codes = self.strategy.required_codes()
+        code_set = {c["code"] for c in codes}
+        assert {"005930", "000660"} == code_set
+        assert all(c["market"] == "KR" for c in codes)
+
+    def test_prepare_signal_kwargs_valid(self):
+        ohlc = {
+            "005930": _make_ohlc_df(n=5, seed=0),
+            "000660": _make_ohlc_df(n=5, seed=1),
+        }
+        result = self.strategy.prepare_signal_kwargs(ohlc)
+        assert "ohlc_data" in result
+        assert len(result["ohlc_data"]) == 2
+
+    def test_prepare_signal_kwargs_insufficient_data(self):
+        """1일치 데이터 → 최소 2일 미달 → 스킵"""
+        result = self.strategy.prepare_signal_kwargs({
+            "005930": _make_ohlc_df(n=1),
+        })
+        assert result == {}
+
+    def test_prepare_signal_kwargs_series_skipped(self):
+        """Series 데이터 → OHLC 아니므로 스킵"""
+        result = self.strategy.prepare_signal_kwargs({
+            "005930": pd.Series([100, 101, 102]),
+        })
+        assert result == {}
+
+    def test_target_price_calculation(self):
+        """목표가 = 오늘 시가 + 전일 (고가 - 저가) × k"""
+        df = pd.DataFrame([
+            {"date": "2024-01-01", "open": 50000, "high": 52000, "low": 48000, "close": 51000},
+            {"date": "2024-01-02", "open": 51000, "high": 53000, "low": 49000, "close": 52000},
+        ])
+        ohlc_data = {"005930": df}
+        self.strategy._update_targets(ohlc_data)
+
+        # target = today_open(51000) + (prev_high(52000) - prev_low(48000)) * 0.5 = 51000 + 2000 = 53000
+        assert "005930" in self.strategy.today_targets
+        assert self.strategy.today_targets["005930"] == 53000.0
+
+    def test_target_recalc_on_new_date(self):
+        """날짜 변경 시 목표가 재계산"""
+        df1 = pd.DataFrame([
+            {"date": "2024-01-01", "open": 50000, "high": 52000, "low": 48000, "close": 51000},
+            {"date": "2024-01-02", "open": 51000, "high": 53000, "low": 49000, "close": 52000},
+        ])
+        self.strategy._update_targets({"005930": df1})
+        target_day2 = self.strategy.today_targets["005930"]
+
+        df2 = pd.DataFrame([
+            {"date": "2024-01-01", "open": 50000, "high": 52000, "low": 48000, "close": 51000},
+            {"date": "2024-01-02", "open": 51000, "high": 53000, "low": 49000, "close": 52000},
+            {"date": "2024-01-03", "open": 52000, "high": 55000, "low": 50000, "close": 54000},
+        ])
+        self.strategy._update_targets({"005930": df2})
+        target_day3 = self.strategy.today_targets["005930"]
+
+        assert target_day2 != target_day3
+        # day3: 52000 + (53000 - 49000) * 0.5 = 52000 + 2000 = 54000
+        assert target_day3 == 54000.0
+
+    def test_target_not_recalc_same_date(self):
+        """같은 날짜 → 재계산 안함"""
+        df = pd.DataFrame([
+            {"date": "2024-01-01", "open": 50000, "high": 52000, "low": 48000, "close": 51000},
+            {"date": "2024-01-02", "open": 51000, "high": 53000, "low": 49000, "close": 52000},
+        ])
+        self.strategy._update_targets({"005930": df})
+        self.strategy.today_targets["005930"] = 99999  # manually overwrite
+        self.strategy._update_targets({"005930": df})  # same date → skip
+        assert self.strategy.today_targets["005930"] == 99999  # unchanged
+
+    def test_backtest_breakout_buy(self):
+        """백테스트: 고가 ≥ 목표가 → BUY 신호"""
+        df = pd.DataFrame([
+            {"date": "2024-01-01", "open": 50000, "high": 52000, "low": 48000, "close": 51000},
+            {"date": "2024-01-02", "open": 51000, "high": 55000, "low": 49000, "close": 52000},
+        ])
+        # target = 51000 + (52000 - 48000) * 0.5 = 53000, high = 55000 ≥ 53000 → buy
+        signals = self.strategy.generate_signals(ohlc_data={"005930": df})
+        buy_signals = [s for s in signals if s.signal == Signal.BUY]
+        assert len(buy_signals) == 1
+        assert buy_signals[0].code == "005930"
+        assert buy_signals[0].price == 53000.0  # target price
+
+    def test_backtest_no_breakout(self):
+        """백테스트: 고가 < 목표가 → 신호 없음"""
+        df = pd.DataFrame([
+            {"date": "2024-01-01", "open": 50000, "high": 52000, "low": 48000, "close": 51000},
+            {"date": "2024-01-02", "open": 51000, "high": 52500, "low": 49000, "close": 52000},
+        ])
+        # target = 53000, high = 52500 < 53000 → no signal
+        signals = self.strategy.generate_signals(ohlc_data={"005930": df})
+        assert len(signals) == 0
+
+    def test_backtest_close_after_buy(self):
+        """백테스트: 진입 다음날 청산 확인"""
+        # Day 1→2: breakout → buy
+        df_day2 = pd.DataFrame([
+            {"date": "2024-01-01", "open": 50000, "high": 52000, "low": 48000, "close": 51000},
+            {"date": "2024-01-02", "open": 51000, "high": 55000, "low": 49000, "close": 52000},
+        ])
+        signals = self.strategy.generate_signals(ohlc_data={"005930": df_day2})
+        for s in signals:
+            self.strategy.on_trade_executed(s, success=True)
+        assert "005930" in self.strategy.current_holdings
+
+        # Day 2→3: close existing + potentially new breakout
+        df_day3 = pd.DataFrame([
+            {"date": "2024-01-01", "open": 50000, "high": 52000, "low": 48000, "close": 51000},
+            {"date": "2024-01-02", "open": 51000, "high": 55000, "low": 49000, "close": 52000},
+            {"date": "2024-01-03", "open": 52000, "high": 52500, "low": 50000, "close": 51000},
+        ])
+        signals = self.strategy.generate_signals(ohlc_data={"005930": df_day3})
+        close_signals = [s for s in signals if s.signal == Signal.CLOSE]
+        assert len(close_signals) == 1
+        assert close_signals[0].code == "005930"
+
+    def test_no_duplicate_entry_same_day(self):
+        """같은 날 같은 종목 2번 진입 방지"""
+        df = pd.DataFrame([
+            {"date": "2024-01-01", "open": 50000, "high": 52000, "low": 48000, "close": 51000},
+            {"date": "2024-01-02", "open": 51000, "high": 55000, "low": 49000, "close": 52000},
+        ])
+        signals1 = self.strategy.generate_signals(ohlc_data={"005930": df})
+        for s in signals1:
+            self.strategy.on_trade_executed(s, success=True)
+
+        # same day, same data → no new buy
+        signals2 = self.strategy.generate_signals(ohlc_data={"005930": df})
+        buy_signals = [s for s in signals2 if s.signal == Signal.BUY]
+        assert len(buy_signals) == 0
+
+    def test_live_breakout(self):
+        """실시간 모드: 현재가 ≥ 목표가 → BUY"""
+        df = pd.DataFrame([
+            {"date": "2024-01-01", "open": 50000, "high": 52000, "low": 48000, "close": 51000},
+            {"date": "2024-01-02", "open": 51000, "high": 53000, "low": 49000, "close": 52000},
+        ])
+        # target = 53000
+        with patch("src.strategies.volatility_breakout.datetime") as mock_dt:
+            mock_dt.now.return_value.strftime.return_value = "10:00"
+            signals = self.strategy.generate_signals(
+                ohlc_data={"005930": df},
+                current_prices={"005930": 54000},
+            )
+        buy_signals = [s for s in signals if s.signal == Signal.BUY]
+        assert len(buy_signals) == 1
+        assert buy_signals[0].price == 54000
+
+    def test_live_no_breakout(self):
+        """실시간 모드: 현재가 < 목표가 → 신호 없음"""
+        df = pd.DataFrame([
+            {"date": "2024-01-01", "open": 50000, "high": 52000, "low": 48000, "close": 51000},
+            {"date": "2024-01-02", "open": 51000, "high": 53000, "low": 49000, "close": 52000},
+        ])
+        with patch("src.strategies.volatility_breakout.datetime") as mock_dt:
+            mock_dt.now.return_value.strftime.return_value = "10:00"
+            signals = self.strategy.generate_signals(
+                ohlc_data={"005930": df},
+                current_prices={"005930": 52000},
+            )
+        assert len(signals) == 0
+
+    def test_live_close_time(self):
+        """실시간 모드: 장 마감 시간 → CLOSE 신호"""
+        df = pd.DataFrame([
+            {"date": "2024-01-01", "open": 50000, "high": 52000, "low": 48000, "close": 51000},
+            {"date": "2024-01-02", "open": 51000, "high": 53000, "low": 49000, "close": 52000},
+        ])
+        self.strategy.current_holdings = {"005930"}
+        with patch("src.strategies.volatility_breakout.datetime") as mock_dt:
+            mock_dt.now.return_value.strftime.return_value = "15:20"
+            signals = self.strategy.generate_signals(
+                ohlc_data={"005930": df},
+                current_prices={"005930": 54000},
+            )
+        close_signals = [s for s in signals if s.signal == Signal.CLOSE]
+        assert len(close_signals) == 1
+        assert close_signals[0].code == "005930"
+
+    def test_on_trade_executed_buy(self):
+        signal = TradeSignal(
+            strategy="VolatilityBreakout", code="005930", market="KR",
+            signal=Signal.BUY, price=53000,
+        )
+        self.strategy.on_trade_executed(signal, success=True)
+        assert "005930" in self.strategy.today_entered
+        assert "005930" in self.strategy.current_holdings
+
+    def test_on_trade_executed_close(self):
+        self.strategy.current_holdings = {"005930"}
+        signal = TradeSignal(
+            strategy="VolatilityBreakout", code="005930", market="KR",
+            signal=Signal.CLOSE,
+        )
+        self.strategy.on_trade_executed(signal, success=True)
+        assert "005930" not in self.strategy.current_holdings
+
+    def test_on_trade_executed_failure_no_change(self):
+        signal = TradeSignal(
+            strategy="VolatilityBreakout", code="005930", market="KR",
+            signal=Signal.BUY, price=53000,
+        )
+        self.strategy.on_trade_executed(signal, success=False)
+        assert "005930" not in self.strategy.today_entered
+        assert "005930" not in self.strategy.current_holdings
+
+    def test_disabled_returns_empty(self):
+        self.strategy.enabled = False
+        df = pd.DataFrame([
+            {"date": "2024-01-01", "open": 50000, "high": 52000, "low": 48000, "close": 51000},
+            {"date": "2024-01-02", "open": 51000, "high": 55000, "low": 49000, "close": 52000},
+        ])
+        assert self.strategy.generate_signals(ohlc_data={"005930": df}) == []
+
+    def test_get_status(self):
+        status = self.strategy.get_status()
+        assert status["strategy"] == "VolatilityBreakout"
+        assert status["params"]["k"] == 0.5
+        assert status["params"]["universe_count"] == 2

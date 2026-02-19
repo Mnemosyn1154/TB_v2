@@ -157,6 +157,9 @@ class BacktestEngine:
         self._price_lookup = self._build_price_lookup(price_data)
         # {code: [(date_str, close), ...]} 정렬된 리스트 (look-ahead bias 방지용)
         self._price_series_cache = self._build_price_series_cache(price_data)
+        # OHLC 전략용 날짜 캐시 (needs_ohlc=True인 전략만)
+        if getattr(self.strategy, "needs_ohlc", False):
+            self._ohlc_dates_cache = self._build_ohlc_dates_cache(price_data)
 
         # ── 일별 시뮬레이션 루프 ──
         for date in all_dates:
@@ -245,12 +248,20 @@ class BacktestEngine:
         if self.strategy.should_skip_date(date, self.equity_history):
             return []
 
-        # 2. 현재 날짜까지의 종가 시리즈 (look-ahead bias 방지)
-        truncated: dict[str, pd.Series] = {}
-        for code, df in price_data.items():
-            prices = self._get_prices_until(df, date)
-            if len(prices) > 0:
-                truncated[code] = prices
+        # 2. 현재 날짜까지의 데이터 (look-ahead bias 방지)
+        truncated: dict = {}
+        if getattr(self.strategy, "needs_ohlc", False):
+            # OHLC 전략: 전체 DataFrame 전달
+            for code, df in price_data.items():
+                ohlc = self._get_ohlc_until(df, code, date)
+                if len(ohlc) > 0:
+                    truncated[code] = ohlc
+        else:
+            # 일반 전략: 종가 시리즈만 전달
+            for code, df in price_data.items():
+                prices = self._get_prices_until(df, date)
+                if len(prices) > 0:
+                    truncated[code] = prices
 
         if not truncated:
             return []
@@ -266,7 +277,8 @@ class BacktestEngine:
     def _execute_signal(self, date: str, signal: TradeSignal,
                         day_prices: dict[str, float]) -> None:
         """신호를 가상 체결"""
-        price = day_prices.get(signal.code, signal.price)
+        # signal.price > 0이면 전략이 지정한 가격 우선 (예: 변동성 돌파 목표가)
+        price = signal.price if signal.price > 0 else day_prices.get(signal.code, 0)
         if price <= 0:
             return
 
@@ -546,6 +558,45 @@ class BacktestEngine:
             mask = df.index.strftime("%Y-%m-%d") <= date
             return df.loc[mask, "close"]
         return pd.Series(dtype=float)
+
+    def _build_ohlc_dates_cache(
+        self, price_data: dict[str, pd.DataFrame],
+    ) -> dict[str, list[str]]:
+        """OHLC 날짜 캐시: {code: [sorted_date_strings]}
+
+        _get_ohlc_until()에서 bisect로 O(log n) 슬라이싱에 사용합니다.
+        """
+        cache: dict[str, list[str]] = {}
+        for code, df in price_data.items():
+            if "date" in df.columns:
+                dates = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d").tolist()
+            elif isinstance(df.index, pd.DatetimeIndex):
+                dates = df.index.strftime("%Y-%m-%d").tolist()
+            else:
+                continue
+            cache[code] = sorted(dates)
+        return cache
+
+    def _get_ohlc_until(self, df: pd.DataFrame, code: str,
+                        date: str) -> pd.DataFrame:
+        """특정 날짜까지의 OHLC DataFrame 반환 (look-ahead bias 방지, bisect O(log n))"""
+        from bisect import bisect_right
+
+        if hasattr(self, "_ohlc_dates_cache") and code in self._ohlc_dates_cache:
+            dates = self._ohlc_dates_cache[code]
+            idx = bisect_right(dates, date)
+            if idx == 0:
+                return pd.DataFrame()
+            return df.iloc[:idx]
+
+        # 캐시 미스 시 폴백
+        if "date" in df.columns:
+            mask = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d") <= date
+            return df.loc[mask].reset_index(drop=True)
+        elif isinstance(df.index, pd.DatetimeIndex):
+            mask = df.index.strftime("%Y-%m-%d") <= date
+            return df.loc[mask]
+        return pd.DataFrame()
 
     def _build_result(self, all_dates: list[str]) -> BacktestResult:
         """시뮬레이션 결과를 BacktestResult로 변환"""
