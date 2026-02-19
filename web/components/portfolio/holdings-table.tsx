@@ -68,16 +68,27 @@ function StrategyCard({
               {positions.length}종목
             </span>
           </CardTitle>
-          <div className="flex items-center gap-3 text-sm">
-            <span
-              className={cn(
-                "font-mono font-semibold",
-                summary.pnlPct > 0 && "text-success",
-                summary.pnlPct < 0 && "text-destructive"
-              )}
-            >
-              {formatPercent(summary.pnlPct)}
-            </span>
+          <div className="flex items-center gap-4 text-sm">
+            <div className="text-right">
+              <div className="text-xs text-muted-foreground">투자원금</div>
+              <div className="font-mono">{formatKRW(summary.totalCost)}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-muted-foreground">평가금액</div>
+              <div className="font-mono">{formatKRW(summary.totalValue)}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-muted-foreground">수익률</div>
+              <div
+                className={cn(
+                  "font-mono font-semibold",
+                  summary.pnlPct > 0 && "text-success",
+                  summary.pnlPct < 0 && "text-destructive"
+                )}
+              >
+                {formatPercent(summary.pnlPct)}
+              </div>
+            </div>
           </div>
         </div>
       </CardHeader>

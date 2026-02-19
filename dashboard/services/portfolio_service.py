@@ -159,7 +159,7 @@ def _build_name_lookup() -> dict[str, str]:
                 lookup[str(item["code"])] = item["name"]
         for item in strat.get("sectors", []):
             if item.get("code") and item.get("name"):
-                lookup[str(item["code"])] = item["name"]
+                lookup[str(item["code"])] = f"{item['name']} 섹터"
         # pairs
         for pair in strat.get("pairs", []):
             if pair.get("name"):
