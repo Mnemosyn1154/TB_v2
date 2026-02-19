@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   Table,
   TableBody,
@@ -18,32 +17,20 @@ interface HoldingsTableProps {
   us: MarketBalance;
 }
 
-export function HoldingsTable({ kr, us }: HoldingsTableProps) {
-  const [market, setMarket] = useState<"KR" | "US">("KR");
-  const positions = market === "KR" ? kr.positions : us.positions;
-  const formatPrice = market === "KR" ? formatKRW : formatUSD;
-
+function MarketSection({
+  label,
+  positions,
+  formatPrice,
+}: {
+  label: string;
+  positions: Position[];
+  formatPrice: (v: number) => string;
+}) {
   return (
     <div>
-      <div className="mb-4 flex items-center gap-2">
-        {(["KR", "US"] as const).map((m) => (
-          <button
-            key={m}
-            onClick={() => setMarket(m)}
-            className={cn(
-              "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-              market === m
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-accent"
-            )}
-          >
-            {m === "KR" ? "국내" : "해외"}
-          </button>
-        ))}
-      </div>
-
+      <h3 className="mb-2 text-sm font-semibold">{label}</h3>
       {positions.length === 0 ? (
-        <div className="flex h-32 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
+        <div className="flex h-20 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
           보유 종목이 없습니다
         </div>
       ) : (
@@ -103,6 +90,15 @@ export function HoldingsTable({ kr, us }: HoldingsTableProps) {
           </Table>
         </div>
       )}
+    </div>
+  );
+}
+
+export function HoldingsTable({ kr, us }: HoldingsTableProps) {
+  return (
+    <div className="flex flex-col gap-6">
+      <MarketSection label="국내" positions={kr.positions} formatPrice={formatKRW} />
+      <MarketSection label="해외" positions={us.positions} formatPrice={formatUSD} />
     </div>
   );
 }
