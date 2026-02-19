@@ -2,9 +2,14 @@ from __future__ import annotations
 
 """Pydantic 모델 — 요청/응답 스키마"""
 
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel
+
+
+class ModeRequest(BaseModel):
+    mode: Literal["simulation", "paper", "live"]
+    confirm: bool = False  # required for "live"
 
 
 class BacktestRequest(BaseModel):

@@ -255,6 +255,39 @@ class KISBroker:
         return data
 
     # ──────────────────────────────────────────────
+    # 연결 검증
+    # ──────────────────────────────────────────────
+
+    def verify_connection(self) -> dict[str, Any]:
+        """KIS API 연결 상태 검증 (read-only, 삼성전자 시세 조회)
+
+        Returns:
+            connected: bool
+            mode: "live" | "paper"
+            account: str (마스킹된 계좌번호)
+            error: str | None
+        """
+        mode = "live" if self.live_trading else "paper"
+        masked = self.account_no[:4] + "****" if len(self.account_no) >= 4 else self.account_no
+
+        if not self.app_key or not self.app_secret:
+            return {"connected": False, "mode": mode, "account": masked,
+                    "error": "KIS API 키가 설정되지 않았습니다"}
+        if not self.account_no:
+            return {"connected": False, "mode": mode, "account": masked,
+                    "error": "KIS 계좌번호가 설정되지 않았습니다"}
+        try:
+            self.get_kr_price("005930")  # 삼성전자 시세 조회
+            return {"connected": True, "mode": mode, "account": masked, "error": None}
+        except Exception as e:
+            err = str(e)
+            if "403" in err or "Forbidden" in err:
+                err = "인증 실패 (403) — API 키/시크릿이 유효하지 않습니다"
+            elif "401" in err or "Unauthorized" in err:
+                err = "토큰 만료 (401) — data/kis_token_*.json 삭제 후 재시도하세요"
+            return {"connected": False, "mode": mode, "account": masked, "error": err}
+
+    # ──────────────────────────────────────────────
     # 국내 주식
     # ──────────────────────────────────────────────
 

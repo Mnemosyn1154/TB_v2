@@ -12,6 +12,7 @@ import { ModeToggle } from "./mode-toggle";
 import { KillSwitch } from "./kill-switch";
 import { ExecutionStatus } from "./execution-status";
 import { LogViewer } from "./log-viewer";
+import { KisStatus } from "./kis-status";
 import type { TradingMode } from "@/types/control";
 
 interface ControlTabProps {
@@ -22,15 +23,16 @@ export function ControlTab({ onModeChange }: ControlTabProps) {
   const killSwitch = useKillSwitch();
   const execution = useBotExecution();
   const scheduler = useScheduler();
-  const { mode, switchMode } = useTradingMode();
+  const tradingMode = useTradingMode();
   const { logs, addLog, clearLogs } = useLogViewer(
     execution.running || execution.collecting
   );
 
-  const handleModeChange = (newMode: TradingMode) => {
-    switchMode(newMode);
+  const handleModeChange = async (newMode: TradingMode, confirm?: boolean) => {
+    const labels = { simulation: "시뮬레이션", paper: "모의투자", live: "실거래" };
+    addLog("INFO", `모드 전환: ${labels[newMode]}...`);
+    await tradingMode.switchMode(newMode, confirm);
     onModeChange?.(newMode);
-    addLog("INFO", `모드 전환: ${newMode === "live" ? "실거래" : "모의투자"}`);
   };
 
   const handleRun = async () => {
@@ -84,8 +86,16 @@ export function ControlTab({ onModeChange }: ControlTabProps) {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">실행 & 제어</h2>
-        <ModeToggle mode={mode} onModeChange={handleModeChange} />
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold">실행 & 제어</h2>
+          <KisStatus />
+        </div>
+        <ModeToggle
+          mode={tradingMode.mode}
+          switching={tradingMode.switching}
+          error={tradingMode.error}
+          onModeChange={handleModeChange}
+        />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">

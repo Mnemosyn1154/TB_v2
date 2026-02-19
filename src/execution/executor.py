@@ -17,6 +17,9 @@ Modification Guide:
     - 새로운 Signal 타입을 처리하려면 execute_signals()의 분기를 추가하세요.
     - 현재가 조회의 거래소 매핑은 src.core.exchange 유틸리티를 참조하세요.
 """
+from __future__ import annotations
+
+import json
 from datetime import datetime
 from typing import Any
 
@@ -81,6 +84,21 @@ class OrderExecutor:
             except Exception as e:
                 logger.warning(f"시뮬레이션 가격 갱신 실패: {pos['code']} — {e}")
 
+    def scan_stop_losses(self) -> list[TradeSignal]:
+        """보유 포지션 중 손절 조건에 해당하는 종목의 SELL 시그널을 생성합니다."""
+        sell_signals: list[TradeSignal] = []
+        for pos in self.risk_manager.state.positions:
+            if self.risk_manager.check_stop_loss(pos):
+                sell_signals.append(TradeSignal(
+                    code=pos.code,
+                    market=pos.market,
+                    signal=Signal.SELL,
+                    strategy=pos.strategy,
+                    reason=(f"손절: {pos.pnl_pct:.1f}% <= "
+                            f"{self.risk_manager.stop_loss_pct}%"),
+                ))
+        return sell_signals
+
     def execute_signals(self, signals: list[TradeSignal]) -> None:
         """
         매매 신호 리스트를 순차적으로 실행합니다.
@@ -88,9 +106,27 @@ class OrderExecutor:
         Args:
             signals: Strategy에서 생성한 TradeSignal 리스트
         """
-        # 시뮬레이션 모드: 기존 포지션 현재가 갱신
+        # 1. 시뮬레이션 모드: 기존 포지션 현재가 갱신
         self._update_sim_prices()
 
+        # 2. 포트폴리오 리스크 체크 (MDD/일일손실 초과 시 킬스위치 자동 발동)
+        safe, reason = self.risk_manager.check_portfolio_risk()
+        if not safe:
+            logger.critical(f"포트폴리오 리스크 위반 — 전체 실행 중단: {reason}")
+            self.notifier.notify_risk(f"🚨 KILL SWITCH AUTO: {reason}")
+            return
+
+        # 3. 손절 스캔 — 전략 시그널보다 우선 실행
+        stop_signals = self.scan_stop_losses()
+        if stop_signals:
+            logger.warning(f"손절 시그널 {len(stop_signals)}건 — 우선 실행")
+            for sig in stop_signals:
+                try:
+                    self._execute_sell(sig)
+                except Exception as e:
+                    logger.error(f"손절 실행 실패: {sig.code} — {e}")
+
+        # 4. 전략 시그널 실행
         if not signals:
             return
 
@@ -156,10 +192,18 @@ class OrderExecutor:
                 )
                 return
             if signal.market == "KR":
-                self.broker.order_kr_buy(signal.code, quantity)
+                result = self.broker.order_kr_buy(signal.code, quantity)
             else:
                 exchange = get_us_exchange(signal.code, purpose="order")
-                self.broker.order_us_buy(signal.code, quantity, exchange=exchange)
+                result = self.broker.order_us_buy(signal.code, quantity, exchange=exchange)
+            # 주문 결과 저장
+            order_no = result.get("output", {}).get("ODNO", "")
+            self.data_manager.save_order(
+                order_no=order_no, strategy=signal.strategy,
+                code=signal.code, market=signal.market, side="BUY",
+                quantity=quantity, price=price,
+                response_json=json.dumps(result, ensure_ascii=False),
+            )
 
         # 5. 포지션 등록
         self.risk_manager.add_position(Position(
@@ -219,10 +263,18 @@ class OrderExecutor:
                 )
                 return
             if signal.market == "KR":
-                self.broker.order_kr_sell(signal.code, quantity)
+                result = self.broker.order_kr_sell(signal.code, quantity)
             else:
                 exchange = get_us_exchange(signal.code, purpose="order")
-                self.broker.order_us_sell(signal.code, quantity, exchange=exchange)
+                result = self.broker.order_us_sell(signal.code, quantity, exchange=exchange)
+            # 주문 결과 저장
+            order_no = result.get("output", {}).get("ODNO", "")
+            self.data_manager.save_order(
+                order_no=order_no, strategy=signal.strategy,
+                code=signal.code, market=signal.market, side="SELL",
+                quantity=quantity, price=price,
+                response_json=json.dumps(result, ensure_ascii=False),
+            )
 
         # 포지션 제거 + 기록 + 알림
         self.risk_manager.remove_position(signal.code)

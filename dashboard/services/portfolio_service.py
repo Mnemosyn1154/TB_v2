@@ -130,11 +130,22 @@ def _get_kis_portfolio() -> dict:
             "risk": _empty_risk(),
         }
 
+    # RiskManager에 KIS 포지션 동기화
     risk_mgr = RiskManager()
     total_equity = kr_balance.get("total_equity", 0)
     cash = kr_balance.get("cash", 0)
     if total_equity > 0:
         risk_mgr.update_equity(total_equity, cash)
+
+    all_positions = kr_balance.get("positions", []) + us_balance.get("positions", [])
+    risk_mgr.state.positions = [
+        Position(
+            code=p["code"], market=p["market"], side="LONG",
+            quantity=p["quantity"], entry_price=p["avg_price"],
+            current_price=p["current_price"],
+        )
+        for p in all_positions
+    ]
 
     return {
         "kr": kr_balance,

@@ -43,7 +43,7 @@ export function DashboardHeader({
   const botStatus = useBotStatus();
 
   // botStatus에서 모드를 가져오되, 없으면 tradingMode prop fallback
-  const displayMode = botStatus?.mode ?? tradingMode ?? "paper";
+  const displayMode = botStatus?.mode ?? tradingMode ?? "simulation";
 
   return (
     <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-md">
@@ -54,13 +54,19 @@ export function DashboardHeader({
           <div className="hidden sm:flex items-center gap-1.5">
             <Badge
               variant={displayMode === "live" ? "destructive" : "secondary"}
-              className="text-[10px] px-1.5 py-0"
+              className={`text-[10px] px-1.5 py-0 ${
+                displayMode === "simulation"
+                  ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
+                  : displayMode === "paper"
+                    ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                    : ""
+              }`}
             >
               {displayMode === "live"
                 ? "실거래"
                 : displayMode === "paper"
                   ? "모의"
-                  : "대기"}
+                  : "시뮬"}
             </Badge>
             {botStatus?.kill_switch != null &&
               (botStatus.kill_switch ? (

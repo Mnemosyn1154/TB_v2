@@ -11,6 +11,8 @@ import {
   runBot,
   collectData,
   invalidateCache,
+  getTradingMode,
+  setTradingMode,
 } from "@/lib/api-client";
 import type {
   KillSwitchStatus,
@@ -170,13 +172,42 @@ export function useScheduler() {
 }
 
 export function useTradingMode() {
-  const [mode, setMode] = useState<TradingMode>("paper");
+  const [mode, setMode] = useState<TradingMode>("simulation");
+  const [switching, setSwitching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const switchMode = useCallback((newMode: TradingMode) => {
-    setMode(newMode);
+  // Fetch current mode on mount
+  const fetchMode = useCallback(async () => {
+    try {
+      const res = (await getTradingMode()) as ApiResponse<{ mode: TradingMode }>;
+      if (res.data?.mode) {
+        setMode(res.data.mode);
+      }
+    } catch {
+      // silently fail
+    }
   }, []);
 
-  return { mode, switchMode };
+  useInterval(fetchMode, 30_000);
+
+  const switchMode = useCallback(async (newMode: TradingMode, confirm = false) => {
+    setSwitching(true);
+    setError(null);
+    try {
+      const res = (await setTradingMode(newMode, confirm)) as ApiResponse<{ mode: TradingMode }>;
+      if (res.error) {
+        setError(res.error);
+      } else if (res.data?.mode) {
+        setMode(res.data.mode);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "모드 전환 실패");
+    } finally {
+      setSwitching(false);
+    }
+  }, []);
+
+  return { mode, switching, error, switchMode, refetch: fetchMode };
 }
 
 export function useLogViewer(active: boolean) {

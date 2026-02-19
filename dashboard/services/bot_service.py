@@ -12,7 +12,7 @@ from datetime import datetime
 from loguru import logger
 
 from src.core.config import get_config, load_env, reload_config
-from src.core.risk_manager import RiskManager
+from src.core.risk_manager import RiskManager, Position
 from src.strategies import STRATEGY_REGISTRY
 from src.strategies.base import BaseStrategy
 
@@ -96,6 +96,26 @@ def run_once() -> dict:
     tracker = PortfolioTracker(dm.engine) if simulation_mode else None
     if tracker:
         sync_risk_manager(rm, tracker)
+    else:
+        # 비시뮬 모드: KIS 실계좌 잔고에서 RiskManager 동기화
+        try:
+            kr_bal = broker.get_kr_balance()
+            total_equity = kr_bal.get("total_equity", 0)
+            cash = kr_bal.get("cash", 0)
+            if total_equity > 0 or cash > 0:
+                rm.update_equity(total_equity, cash)
+                rm.state.positions = [
+                    Position(
+                        code=p["code"], market=p["market"], side="LONG",
+                        quantity=p["quantity"], entry_price=p["avg_price"],
+                        current_price=p["current_price"],
+                    )
+                    for p in kr_bal.get("positions", [])
+                ]
+                logger.info(f"KIS 잔고 동기화: equity={total_equity:,}, "
+                            f"cash={cash:,}, positions={len(rm.state.positions)}")
+        except Exception as e:
+            logger.warning(f"KIS 잔고 동기화 실패 (실행은 계속): {e}")
 
     executor = OrderExecutor(
         broker, rm, dm, notifier,
