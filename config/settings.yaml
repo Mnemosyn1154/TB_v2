@@ -211,21 +211,6 @@ strategies:
         market: US
         name: Mastercard
         exchange: NYS
-  sam_hynix:
-    enabled: false
-    pairs:
-      - name: Samsung_Hynix
-        market: KR
-        stock_a: '005930'
-        stock_b: '000660'
-        hedge_etf: '114800'
-    lookback_window: 90
-    entry_z_score: 1.5
-    exit_z_score: 0.5
-    stop_loss_z_score: 3
-    recalc_beta_days: 20
-    coint_pvalue: 0.1
-    type: stat_arb
   sector_rotation:
     enabled: false
     lookback_months: 6
@@ -297,9 +282,9 @@ strategies:
         market: KR
         name: 셀트리온
   bollinger_band:
-    enabled: false
+    enabled: true
     window: 20
-    num_std: 2.0
+    num_std: 2
     market: KR
     max_hold_per_stock: 1
     universe_codes:
