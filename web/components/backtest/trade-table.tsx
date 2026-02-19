@@ -22,7 +22,7 @@ interface TradeTableProps {
 
 export function TradeTable({ trades }: TradeTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("date");
-  const [sortAsc, setSortAsc] = useState(false);
+  const [sortAsc, setSortAsc] = useState(true);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
