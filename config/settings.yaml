@@ -296,6 +296,22 @@ strategies:
       - code: '068270'
         market: KR
         name: 셀트리온
+  bollinger_band:
+    enabled: false
+    window: 20
+    num_std: 2.0
+    market: KR
+    max_hold_per_stock: 1
+    universe_codes:
+      - code: '005930'
+        market: KR
+        name: 삼성전자
+      - code: '000660'
+        market: KR
+        name: SK하이닉스
+      - code: '035420'
+        market: KR
+        name: NAVER
 risk:
   max_position_pct: 10
   stop_loss_pct: -7

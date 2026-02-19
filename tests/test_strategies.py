@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""전략 유닛 테스트: StatArb, DualMomentum, QuantFactor, VolatilityBreakout"""
+"""전략 유닛 테스트: StatArb, DualMomentum, QuantFactor, VolatilityBreakout, BollingerBand"""
 
 from unittest.mock import patch
 
@@ -780,3 +780,138 @@ class TestVolatilityBreakout:
         assert status["strategy"] == "VolatilityBreakout"
         assert status["params"]["k"] == 0.5
         assert status["params"]["universe_count"] == 2
+
+
+# ──────────────────────────────────────────────
+# BollingerBand
+# ──────────────────────────────────────────────
+
+BOLLINGER_BAND_CONFIG = {
+    "simulation": {"enabled": True, "initial_capital": 10_000_000},
+    "strategies": {
+        "bollinger_band": {
+            "enabled": True,
+            "window": 20,
+            "num_std": 2.0,
+            "market": "KR",
+            "max_hold_per_stock": 1,
+            "universe_codes": [
+                {"code": "005930", "market": "KR", "name": "삼성전자"},
+                {"code": "000660", "market": "KR", "name": "SK하이닉스"},
+            ],
+        },
+    },
+}
+
+
+def _make_bb_prices(n: int = 30, base: float = 50000, seed: int = 42) -> pd.Series:
+    """볼린저 밴드 테스트용 종가 시리즈 생성"""
+    rng = np.random.RandomState(seed)
+    returns = rng.randn(n) * 0.01
+    prices = base * np.cumprod(1 + returns)
+    return pd.Series(prices, dtype=float)
+
+
+class TestBollingerBandStrategy:
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        with patch("src.strategies.bollinger_band.get_config",
+                    return_value=BOLLINGER_BAND_CONFIG):
+            from src.strategies.bollinger_band import BollingerBandStrategy
+            self.strategy = BollingerBandStrategy()
+
+    def test_init_loads_config(self):
+        assert self.strategy.window == 20
+        assert self.strategy.num_std == 2.0
+        assert self.strategy.market == "KR"
+        assert len(self.strategy.universe) == 2
+
+    def test_required_codes(self):
+        codes = self.strategy.required_codes()
+        code_set = {c["code"] for c in codes}
+        assert {"005930", "000660"} == code_set
+        assert all(c["market"] == "KR" for c in codes)
+
+    def test_generate_signals_buy(self):
+        """종가가 하단 밴드 아래 → BUY 시그널"""
+        # 안정적 가격 후 급락으로 하단 밴드 이탈 유도
+        rng = np.random.RandomState(99)
+        stable = [50000 + rng.randn() * 100 for _ in range(25)]
+        # 마지막 값을 급격히 하락시켜 하단 밴드 이탈
+        stable.append(stable[-1] - 3000)
+        prices = pd.Series(stable, dtype=float)
+
+        signals = self.strategy.generate_signals(close_data={"005930": prices})
+        buy_signals = [s for s in signals if s.signal == Signal.BUY]
+        assert len(buy_signals) == 1
+        assert buy_signals[0].code == "005930"
+        assert "sma" in buy_signals[0].metadata
+        assert "upper_band" in buy_signals[0].metadata
+        assert "lower_band" in buy_signals[0].metadata
+        assert "percent_b" in buy_signals[0].metadata
+        assert "bandwidth" in buy_signals[0].metadata
+
+    def test_generate_signals_close(self):
+        """종가가 상단 밴드 위 + 보유 중 → CLOSE 시그널"""
+        rng = np.random.RandomState(99)
+        stable = [50000 + rng.randn() * 100 for _ in range(25)]
+        # 마지막 값을 급격히 상승시켜 상단 밴드 돌파
+        stable.append(stable[-1] + 3000)
+        prices = pd.Series(stable, dtype=float)
+
+        # 보유 중이어야 CLOSE 시그널 발생
+        self.strategy.current_holdings.add("005930")
+
+        signals = self.strategy.generate_signals(close_data={"005930": prices})
+        close_signals = [s for s in signals if s.signal == Signal.CLOSE]
+        assert len(close_signals) == 1
+        assert close_signals[0].code == "005930"
+
+    def test_generate_signals_hold(self):
+        """밴드 안에 있을 때 시그널 없음"""
+        # 안정적 가격 → 밴드 안에 위치
+        rng = np.random.RandomState(42)
+        prices = pd.Series(
+            [50000 + rng.randn() * 50 for _ in range(25)], dtype=float,
+        )
+        signals = self.strategy.generate_signals(close_data={"005930": prices})
+        assert signals == []
+
+    def test_disabled_returns_empty(self):
+        """비활성 시 빈 리스트"""
+        self.strategy.enabled = False
+        prices = _make_bb_prices(n=30)
+        assert self.strategy.generate_signals(close_data={"005930": prices}) == []
+
+    def test_insufficient_data(self):
+        """window보다 적은 데이터 시 스킵"""
+        prices = pd.Series([50000, 50100, 50200], dtype=float)
+        result = self.strategy.prepare_signal_kwargs({"005930": prices})
+        assert result == {}
+
+    def test_on_trade_executed(self):
+        """보유 종목 추적 확인"""
+        # BUY
+        buy_signal = TradeSignal(
+            strategy="BollingerBand", code="005930", market="KR",
+            signal=Signal.BUY, price=48000,
+        )
+        self.strategy.on_trade_executed(buy_signal, success=True)
+        assert "005930" in self.strategy.current_holdings
+
+        # CLOSE
+        close_signal = TradeSignal(
+            strategy="BollingerBand", code="005930", market="KR",
+            signal=Signal.CLOSE, price=52000,
+        )
+        self.strategy.on_trade_executed(close_signal, success=True)
+        assert "005930" not in self.strategy.current_holdings
+
+    def test_on_trade_executed_failure_no_change(self):
+        """체결 실패 시 상태 변경 없음"""
+        signal = TradeSignal(
+            strategy="BollingerBand", code="005930", market="KR",
+            signal=Signal.BUY, price=48000,
+        )
+        self.strategy.on_trade_executed(signal, success=False)
+        assert "005930" not in self.strategy.current_holdings
