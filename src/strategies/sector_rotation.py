@@ -197,15 +197,18 @@ class SectorRotationStrategy(BaseStrategy):
 
         # 3. 상위 top_n 선택 + 절대 모멘텀 필터
         new_holdings: set[str] = set()
+        # 무위험수익률을 룩백 기간에 맞게 조정 (연율 → 기간 수익률)
+        period_rf = (1 + self.risk_free_rate) ** (self.lookback_months / 12) - 1
+
         for code, ret in ranked[:self.top_n]:
-            if ret > self.risk_free_rate:
+            if ret > period_rf:
                 new_holdings.add(code)
             else:
                 new_holdings.add(self.safe_asset)
                 name = self._get_sector_name(code)
                 logger.info(
                     f"  ⚠️ {name}({code}) 수익률 {ret*100:+.1f}% < "
-                    f"무위험 {self.risk_free_rate*100:.1f}% → 안전자산({self.safe_asset}) 대체"
+                    f"무위험 {period_rf*100:.1f}% ({self.lookback_months}개월) → 안전자산({self.safe_asset}) 대체"
                 )
 
         # 4. 기존 보유와 비교
