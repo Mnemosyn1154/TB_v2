@@ -193,11 +193,12 @@ python3 main.py backtest-yf -s stat_arb --start 2020-01-01 --end 2024-12-31
 - **시뮬레이션 모드**: SQLite 기반 가상 포트폴리오 (기본 ON, `simulation.enabled` 토글)
   - 실주문 차단 가드, DB 트랜잭션, 포지션 가격 갱신, 스냅샷 기록
 - **Python 3.12**: pyenv로 3.12.12 사용 (`.python-version`), 3.10+ 타입 문법 지원
-- **quant_factor 전략**: settings.yaml에서 disabled (enabled: false)
-- **volatility_breakout 전략**: 래리 윌리엄스 변동성 돌파, OHLC 기반 일중 전략 (disabled by default)
+- **활성 전략** (settings.yaml `enabled: true`): dual_momentum, quant_factor, volatility_breakout
+- **비활성 전략**: stat_arb, sector_rotation, sam_hynix (각 `enabled: false`)
+- **백테스트 리스크**: 백테스트 모드에서 MDD/킬스위치/일일손실 체크 자동 비활성화
 - **테스트**: 85 tests 통과 (`python -m pytest tests/`)
   - `tests/test_simulation_e2e.py` — PortfolioTracker E2E (13 tests)
-  - `tests/test_strategies.py` — StatArb/DualMomentum/QuantFactor/AbsMomentum/VolatilityBreakout 유닛 (72 tests)
+  - `tests/test_strategies.py` — StatArb/DualMomentum/QuantFactor/AbsMomentum/SectorRotation/VolatilityBreakout 유닛 (72 tests)
 - **Settings API**: Python API 없이 Next.js에서 settings.yaml 직접 읽기/쓰기
 - **전략 편집**: StrategyEditor에서 숫자/문자열 파라미터, pairs, universe_codes 편집 가능
 - **백테스트**: inf/NaN 안전 직렬화, 사람이 읽을 수 있는 실행 로그 제공

@@ -64,7 +64,16 @@ python3 main.py run
 Settings:  Browser → /api/settings → config/settings.yaml 직접 읽기/쓰기 (Python API 없음)
 ```
 
-Benchmark는 Python API 경유 (`/py/benchmark/data` → SQLite 캐시 + yfinance 보충).
+Benchmark는 Python API 경유 (3개 엔드포인트):
+- `/py/benchmark/data` — 기간별 인덱스 데이터 (SQLite 캐시 + yfinance 보충)
+- `/py/benchmark/data-range` — 커스텀 날짜 범위 (백테스트 비교용)
+- `/py/benchmark/portfolio-series` — 시뮬레이션 포트폴리오 일별 시계열 (스냅샷 기반)
+
+### 백테스트 모드 리스크 처리
+
+백테스트 실행 시 `RiskManager`는 MDD/킬스위치/일일손실 체크를 자동으로 비활성화한다.
+이는 과거 데이터 시뮬레이션에서 실시간 리스크 관리 로직이 간섭하지 않도록 하기 위함이다.
+구현: `src/core/risk_manager.py`의 `backtest_mode` 플래그.
 
 ## 인증 체계
 

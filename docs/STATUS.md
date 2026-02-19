@@ -7,7 +7,7 @@
 | Phase | 설명 | 상태 |
 |-------|------|------|
 | 0 | 프로젝트 스캐폴딩 (Next.js, shadcn/ui, FastAPI 구조) | DONE |
-| 1 | Python API 라우터 (portfolio, backtest, bot, signals, paper) | DONE |
+| 1 | Python API 라우터 (portfolio, backtest, bot, signals, paper, benchmark) | DONE |
 | 2 | Portfolio 탭 (보유종목, 리스크 지표, KPI 카드) | DONE |
 | 3 | Benchmark 탭 (Yahoo Finance, 전략 vs 시장 비교) | DONE |
 | 4 | Strategy 설정 탭 (토글, 파라미터 편집, 유니버스 뷰어) | DONE |
@@ -17,21 +17,24 @@
 | 8 | 통합 & 폴리시 (공통 컴포넌트, API 캐싱, 반응형) | DONE |
 | 9 | 배포 인프라 (Cloudflare Pages/Tunnel, systemd, GitHub Actions) | DONE |
 
-상세: `docs/mainplan.md` 참조 (Phase 0 상태 테이블은 outdated — 실제로는 모두 완료).
+상세: `docs/mainplan.md` 참조 (히스토리 전용 — 실제로는 모두 완료).
 
 ## 작동하는 기능
 
 - 전체 매매 사이클: CLI로 데이터 수집 → 시그널 생성 → 주문 실행
-- Python API 7개 라우터 (portfolio, backtest, bot, signals, paper, benchmark, simulation)
+- Python API 6개 라우터 (portfolio, backtest, bot, signals, paper, benchmark)
 - 웹 대시보드 6탭 전체 구현 및 백엔드 연동
 - KIS API 통합 (실매매 + 모의투자)
 - 백테스트 엔진 (5개 전략, yfinance 기반, inf/NaN 안전 직렬화, OHLC 전략 지원)
-- 백테스트 실행 로그 (전략별 사람이 읽을 수 있는 요약)
+  - 백테스트 모드에서 MDD/킬스위치/일일손실 체크 자동 비활성화
+  - 거래 결과에 종목명 표시
+  - 백테스트 실행 로그 (전략별 사람이 읽을 수 있는 요약)
 - 전략 인스턴스 CRUD (웹에서 전략 생성/삭제)
 - 전략 파라미터 편집 (숫자/문자열 + pairs + universe_codes + sectors)
 - 동적 전략 UI (settings.yaml 변경 자동 반영)
 - 페이퍼 트레이딩 에러 핸들링 (세션별 오류 분리, 잔고 추적 + 초과 매수 차단)
 - 벤치마크 데이터 DB 캐싱 (SQLite 우선, yfinance 보충) + 포트폴리오 시계열 연동
+  - 3개 엔드포인트: /py/benchmark/data, /py/benchmark/data-range, /py/benchmark/portfolio-series
 - 시뮬레이션 모드 (SQLite 기반 가상 포트폴리오, 기본 ON)
   - 실주문 차단 가드, DB 트랜잭션, 포지션 가격 갱신, 일별 스냅샷
   - RiskManager initial_capital fallback, 시그널 프리뷰 예상 수량/가격
@@ -39,7 +42,7 @@
 - 장 운영시간 체크 (KR/US), 데이터 신선도 경고
 - APScheduler 15분 주기 자동 실행 (장중에만 실행, 킬스위치 연동)
   - 대시보드에서 스케줄러 on/off 토글, 다음 실행/마지막 실행 상태 표시
-- 테스트: 85 tests (시뮬레이션 E2E + 전략 유닛)
+- 테스트: 85 tests (시뮬레이션 E2E 13개 + 전략 유닛 72개)
 - 다크 모드 (기본값)
 - Cloudflare Pages + Tunnel 배포 파이프라인
 
@@ -47,32 +50,40 @@
 
 | 항목 | 상태 | 비고 |
 |------|------|------|
-| quant_factor 전략 | disabled | settings.yaml에서 `enabled: false` |
-| sam_hynix 인스턴스 | disabled | 삼성전자/SK하이닉스 KR 페어, `enabled: false` |
+| 프론트엔드 테스트 | 미구현 | Vitest + React Testing Library 미설정 |
+| 실시간 WebSocket | 미구현 | 폴링 기반 (5분 간격) |
 | Settings API | Next.js 직접 처리 | Python API 라우터 없음, settings.yaml 직접 읽기/쓰기 |
 
 ## 활성 전략 (settings.yaml 기준)
 
+> 아래는 `config/settings.yaml`의 실제 `enabled` 값 기준입니다.
+
 | 전략 | config_key | 상태 | 주요 설정 |
 |------|-----------|------|----------|
-| stat_arb | `stat_arb` | ENABLED | 4 US 페어 (KO_PEP, XOM_CVX, V_MA, MSFT_GOOGL), coint_pvalue=0.1 |
 | dual_momentum | `dual_momentum` | ENABLED | KR(069500)/US(SPY) ETF, 월 1일 리밸런싱 |
-| sector_rotation | `sector_rotation` | ENABLED | US 7섹터 + KR 3섹터 ETF, top_n=3, 6개월 룩백 |
-| quant_factor | `quant_factor` | DISABLED | 멀티팩터 스코어링, KR 25 + US 15 = 40종목 유니버스 |
+| quant_factor | `quant_factor` | ENABLED | 멀티팩터 스코어링 + 절대 모멘텀 필터, KR 20 + US 14 유니버스 |
+| volatility_breakout | `volatility_breakout` | ENABLED | 래리 윌리엄스 변동성 돌파, KR 5종목, k=0.8 |
+| stat_arb | `stat_arb` | DISABLED | 4 US 페어 (KO_PEP, XOM_CVX, V_MA, MSFT_GOOGL), coint_pvalue=0.1 |
+| sector_rotation | `sector_rotation` | DISABLED | US 7섹터 + KR 2섹터 ETF, top_n=3, 6개월 룩백 |
 | sam_hynix | `sam_hynix` | DISABLED | stat_arb 타입, 삼성전자/SK하이닉스 KR 페어 |
-| volatility_breakout | `volatility_breakout` | DISABLED | 래리 윌리엄스 변동성 돌파, KR 5종목 (삼성전자/SK하이닉스/현대차/NAVER/셀트리온) |
 
 ## 최근 주요 변경
+
+### 2026-02-19: 백테스트 안정화
+
+- `src/core/risk_manager.py` — 백테스트 모드에서 MDD/킬스위치/일일손실 리스크 체크 자동 비활성화 (`226703e`)
+- `src/backtest/engine.py` — total 계산을 backtest_mode 가드 이전으로 이동 (`2d2be37`)
+- `pyapi/routers/backtest.py` — 거래 결과에 종목명(stock_name) 포함 (`b895910`)
 
 ### 2026-02-19: 변동성 돌파 전략 (PR #17)
 
 - `src/strategies/volatility_breakout.py` — 래리 윌리엄스 변동성 돌파 전략
-  - 목표가 = 오늘 시가 + 전일 (고가 - 저가) × k
-  - 백테스트: 고가 ≥ 목표가 → 목표가에 매수 근사, 익일 청산
-  - 실시간: 현재가 ≥ 목표가 → 매수, 장 마감 전 청산
+  - 목표가 = 오늘 시가 + 전일 (고가 - 저가) x k
+  - 백테스트: 고가 >= 목표가 → 목표가에 매수 근사, 익일 청산
+  - 실시간: 현재가 >= 목표가 → 매수, 장 마감 전 청산
   - `needs_ohlc = True` 플래그로 OHLC DataFrame 수신
 - `src/backtest/engine.py` — OHLC 전략 지원 (bisect 기반 날짜 캐시, signal.price 우선)
-- `config/settings.yaml` — `volatility_breakout` 설정 (k=0.5, KR 5종목, disabled)
+- `config/settings.yaml` — `volatility_breakout` 설정 (k=0.8, KR 5종목)
 - `tests/test_strategies.py` — VolatilityBreakout 유닛 테스트 20개 추가
 - `main.py` — OHLC 데이터 로딩 + 실시간 현재가 주입 + backtest-yf 선택지 추가
 
@@ -90,13 +101,13 @@
 - `config/settings.yaml` — `scheduler.enabled`, `scheduler.interval_minutes` 추가
 - 대시보드 Control 탭에 스케줄러 토글 + 상태 표시 UI
 
-### 2026-02-19: 시뮬레이션 이슈 수정 (Phase 1–4)
+### 2026-02-19: 시뮬레이션 이슈 수정 (Phase 1-4)
 
 1. **Phase 1 — 시뮬레이션 필수 수정** (`ce32db9`): 3중 버그(수량 0/가격 0) 해결, 실주문 차단 가드, 포지션 가격 갱신, 전략 경고 로그
 2. **Phase 2 — 페이퍼 트레이딩 & 데이터 신뢰성** (`95e4937`): 세션 잔고 추적, 장 운영시간 체크, 데이터 신선도 경고
 3. **Phase 3 — 대시보드 UX 개선** (`3984203`): 캐시 무효화, 토스트 에러 알림, 벤치마크 포트폴리오 시계열 연동
 4. **Phase 4 — 안정성 & 테스트** (`e637900`): DB 트랜잭션, 시뮬레이션 E2E 테스트 13건, 전략 유닛 테스트 36건
-5. **전략 설정 확장**: stat_arb 4페어(KO_PEP, XOM_CVX, V_MA, MSFT_GOOGL), sector_rotation 신규, quant_factor 유니버스 40종목, sam_hynix KR 페어 인스턴스
+5. **전략 설정 확장**: stat_arb 4페어(KO_PEP, XOM_CVX, V_MA, MSFT_GOOGL), sector_rotation 신규, quant_factor 유니버스 34종목, sam_hynix KR 페어 인스턴스
 
 상세: `docs/SIMULATION_ISSUES.md` 참조
 

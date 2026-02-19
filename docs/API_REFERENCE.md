@@ -130,6 +130,10 @@ Bot 상태 응답:
 | Method | Path | 설명 |
 |--------|------|------|
 | GET | `/py/benchmark/data` | 벤치마크 인덱스 가격 (KOSPI, S&P 500, DB 캐시 + yfinance 보충) |
+| GET | `/py/benchmark/data-range` | 커스텀 기간 벤치마크 데이터 (백테스트 비교용) |
+| GET | `/py/benchmark/portfolio-series` | 시뮬레이션 포트폴리오 일별 시계열 (스냅샷 기반) |
+
+#### `/py/benchmark/data`
 
 쿼리 파라미터: `?period=1M|3M|6M|1Y|ALL`
 
@@ -138,6 +142,28 @@ Bot 상태 응답:
 {
   "kospi": { "dates": ["2024-01-02", ...], "prices": [2600.5, ...] },
   "sp500": { "dates": ["2024-01-02", ...], "prices": [4750.2, ...] }
+}
+```
+
+#### `/py/benchmark/data-range`
+
+쿼리 파라미터: `?start=2020-01-01&end=2024-12-31`
+
+커스텀 날짜 범위로 벤치마크 데이터 조회. 백테스트 결과와 시장 지수 비교 시 사용.
+
+응답 data: `/py/benchmark/data`와 동일한 형식.
+
+#### `/py/benchmark/portfolio-series`
+
+쿼리 파라미터: `?period=3M` (기본 3M)
+
+시뮬레이션 포트폴리오의 일별 총자산 시계열. `PortfolioTracker`의 스냅샷 데이터 기반.
+
+응답 data:
+```json
+{
+  "dates": ["2026-02-01", "2026-02-02", ...],
+  "values": [10000000, 10050000, ...]
 }
 ```
 
@@ -169,6 +195,7 @@ Bot 상태 응답:
 | `/api/paper/sessions/[id]/stop` | POST | `/py/paper/sessions/{id}/stop` |
 | `/api/paper/execute` | POST | `/py/paper/execute` |
 | `/api/benchmark` | GET | `/py/benchmark/data` |
+| `/api/benchmark/portfolio-series` | GET | `/py/benchmark/portfolio-series` |
 
 ### 직접 처리 라우트 (Python API 미사용)
 
