@@ -111,8 +111,11 @@ export function TradeTable({ trades }: TradeTableProps) {
                     </TableCell>
                     <TableCell className="text-xs">{t.strategy}</TableCell>
                     <TableCell>
-                      <div>
+                      <div className="flex flex-col">
                         <span className="text-xs font-mono">{t.code}</span>
+                        {t.name && (
+                          <span className="text-[10px] text-muted-foreground">{t.name}</span>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>

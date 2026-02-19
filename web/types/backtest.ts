@@ -26,6 +26,7 @@ export interface Trade {
   date: string;
   strategy: string;
   code: string;
+  name?: string;
   market: Market;
   side: TradeSide;
   quantity: number;

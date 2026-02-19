@@ -70,7 +70,50 @@ def _to_native(obj):
     return obj
 
 
-def _serialize_result(result, metrics: dict) -> dict:
+def _build_name_map(strategy) -> dict[str, str]:
+    """전략 설정에서 종목코드→이름 매핑 구축"""
+    from src.core.config import get_config
+
+    name_map: dict[str, str] = {}
+    config = get_config()
+    cfg = config.get("strategies", {}).get(strategy.config_key, {})
+
+    # universe_codes (quant_factor, volatility_breakout)
+    for item in cfg.get("universe_codes", []):
+        if isinstance(item, dict) and "code" in item and "name" in item:
+            name_map[str(item["code"])] = item["name"]
+
+    # sectors (sector_rotation)
+    for item in cfg.get("sectors", []):
+        if isinstance(item, dict) and "code" in item and "name" in item:
+            name_map[str(item["code"])] = item["name"]
+
+    # pairs (stat_arb) — use pair name as label for stock codes
+    for pair in cfg.get("pairs", []):
+        if isinstance(pair, dict) and "name" in pair:
+            pair_name = pair["name"]
+            for key in ("stock_a", "stock_b"):
+                code = pair.get(key)
+                if code:
+                    name_map.setdefault(str(code), pair_name)
+            hedge = pair.get("hedge_etf")
+            if hedge:
+                name_map.setdefault(str(hedge), f"{pair_name} hedge")
+
+    # dual_momentum ETFs
+    for key, label in [
+        ("kr_etf", "KR ETF"), ("us_etf", "US ETF"),
+        ("safe_kr_etf", "Safe KR"), ("safe_us_etf", "Safe US"),
+        ("safe_asset", "Safe Asset"),
+    ]:
+        code = cfg.get(key)
+        if code:
+            name_map.setdefault(str(code), label)
+
+    return name_map
+
+
+def _serialize_result(result, metrics: dict, name_map: dict[str, str] | None = None) -> dict:
     """BacktestResult + metrics dict → JSON-safe dict"""
     metrics = _to_native(metrics)
     # equity_curve: pd.Series → {dates, values}
@@ -91,11 +134,13 @@ def _serialize_result(result, metrics: dict) -> dict:
         }
 
     # trades
+    nm = name_map or {}
     trades = [
         {
             "date": t.date,
             "strategy": t.strategy,
             "code": t.code,
+            "name": nm.get(t.code, ""),
             "market": t.market,
             "side": t.side,
             "quantity": t.quantity,
@@ -241,7 +286,8 @@ def run_backtest(req: BacktestRequest, secret: None = Depends(verify_secret)):
         metrics = analyzer.summary()
         metrics["data_source"] = data_source
 
-        data = _serialize_result(result, metrics)
+        name_map = _build_name_map(strategy)
+        data = _serialize_result(result, metrics, name_map)
         data["logs"] = _build_summary_logs(req, result, metrics, strategy)
         return _json_response({"data": data, "error": None})
     except Exception as e:
