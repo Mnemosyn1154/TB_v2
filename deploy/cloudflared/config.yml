@@ -25,5 +25,11 @@ ingress:
     originRequest:
       noTLSVerify: true
 
+  # Next.js 웹 대시보드 — 로컬 3000번 포트
+  - hostname: d2trader.your-domain.com
+    service: http://localhost:3000
+    originRequest:
+      noTLSVerify: true
+
   # 그 외 요청은 404
   - service: http_status:404

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+============================================================
+D2trader Cloudflare Tunnel — launchd plist (macOS)
+============================================================
+
+launchd는 systemd의 After=/Requires= 같은 서비스 의존성을 지원하지 않는다.
+대신 wait-for-pyapi.sh wrapper script를 통해 pyapi가 준비될 때까지 기다린다.
+
+설치:
+  sed -e 's|<USER>|'"$USER"'|g' -e 's|<PROJECT_DIR>|/path/to/TB_v2|g' \
+    deploy/launchd/com.d2trader.tunnel.plist \
+    > ~/Library/LaunchAgents/com.d2trader.tunnel.plist
+  chmod +x deploy/launchd/wait-for-pyapi.sh
+  launchctl load ~/Library/LaunchAgents/com.d2trader.tunnel.plist
+
+로그 확인:
+  tail -f ~/Library/Logs/d2trader/tunnel.stdout.log
+  tail -f ~/Library/Logs/d2trader/tunnel.stderr.log
+
+사전 준비:
+  cloudflared tunnel login
+  cloudflared tunnel create d2trader-api
+  cloudflared tunnel route dns d2trader-api api.d2trader.your-domain.com
+  cloudflared tunnel route dns d2trader-api d2trader.your-domain.com
+  # config.yml을 ~/.cloudflared/config.yml로 복사 후 TUNNEL_ID 교체
+
+============================================================
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.d2trader.tunnel</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string><PROJECT_DIR>/deploy/launchd/wait-for-pyapi.sh</string>
+    <string><CLOUDFLARED_BIN></string>
+    <string>tunnel</string>
+    <string>run</string>
+    <string>d2trader-api</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/<USER></string>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
+
+  <key>StandardOutPath</key>
+  <string>/Users/<USER>/Library/Logs/d2trader/tunnel.stdout.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/<USER>/Library/Logs/d2trader/tunnel.stderr.log</string>
+</dict>
+</plist>

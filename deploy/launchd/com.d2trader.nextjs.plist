@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+============================================================
+D2trader Next.js — launchd plist (macOS)
+============================================================
+
+전제 조건:
+  Next.js standalone 빌드가 완료되어야 한다:
+    cd web && npm run build
+
+설치:
+  sed -e 's|<USER>|'"$USER"'|g' -e 's|<PROJECT_DIR>|/path/to/TB_v2|g' \
+    deploy/launchd/com.d2trader.nextjs.plist \
+    > ~/Library/LaunchAgents/com.d2trader.nextjs.plist
+  launchctl load ~/Library/LaunchAgents/com.d2trader.nextjs.plist
+
+로그 확인:
+  tail -f ~/Library/Logs/d2trader/nextjs.stdout.log
+  tail -f ~/Library/Logs/d2trader/nextjs.stderr.log
+
+============================================================
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.d2trader.nextjs</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string><NODE_BIN></string>
+    <string><PROJECT_DIR>/web/.next/standalone/server.js</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string><PROJECT_DIR>/web/.next/standalone</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>NODE_ENV</key>
+    <string>production</string>
+    <key>PORT</key>
+    <string>3000</string>
+    <key>HOSTNAME</key>
+    <string>127.0.0.1</string>
+    <!-- pyapi 프록시에 필요. .env.local 값과 일치시킬 것 -->
+    <key>PYTHON_API_URL</key>
+    <string>http://localhost:8000</string>
+    <key>PYTHON_API_SECRET</key>
+    <string>your-secret-here</string>
+  </dict>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
+
+  <key>StandardOutPath</key>
+  <string>/Users/<USER>/Library/Logs/d2trader/nextjs.stdout.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/<USER>/Library/Logs/d2trader/nextjs.stderr.log</string>
+</dict>
+</plist>

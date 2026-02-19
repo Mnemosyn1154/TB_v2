@@ -27,6 +27,9 @@ info()  { echo -e "${GREEN}[INFO]${NC} $*"; }
 warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
 error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 
+# OS 감지
+OS="$(uname -s)"
+
 # ── 초기 설정 ──
 cmd_setup() {
     info "D2trader 배포 환경 설정 시작..."
@@ -64,12 +67,50 @@ cmd_setup() {
         warn "설치: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/"
     fi
 
+    # 5. macOS: LaunchAgents 설정
+    if [ "$OS" = "Darwin" ]; then
+        _setup_macos_launchd
+    fi
+
     info "설정 완료. 다음 단계:"
     echo "  1. .env 파일 편집 (KIS API 키 등)"
     echo "  2. web/.env.local 편집 (PYTHON_API_SECRET)"
     echo "  3. Cloudflare Tunnel 설정 (deploy/cloudflared/config.yml)"
     echo "  4. ./deploy/deploy.sh build"
     echo "  5. ./deploy/deploy.sh start"
+}
+
+# macOS: plist를 LaunchAgents에 복사하고 플레이스홀더 치환
+_setup_macos_launchd() {
+    local launch_agents="$HOME/Library/LaunchAgents"
+    local log_dir="$HOME/Library/Logs/d2trader"
+    local launchd_src="$SCRIPT_DIR/launchd"
+
+    info "macOS LaunchAgents 설정 중..."
+    mkdir -p "$launch_agents" "$log_dir"
+    chmod +x "$launchd_src/wait-for-pyapi.sh"
+
+    local node_bin
+    node_bin="$(command -v node 2>/dev/null || echo "/usr/local/bin/node")"
+    local cloudflared_bin
+    cloudflared_bin="$(command -v cloudflared 2>/dev/null || echo "cloudflared")"
+
+    for plist in com.d2trader.pyapi.plist com.d2trader.nextjs.plist com.d2trader.tunnel.plist; do
+        local dest="$launch_agents/$plist"
+        # 이미 로드된 경우 먼저 unload
+        launchctl unload "$dest" 2>/dev/null || true
+
+        sed -e "s|<USER>|${USER}|g" \
+            -e "s|<PROJECT_DIR>|${PROJECT_ROOT}|g" \
+            -e "s|<NODE_BIN>|${node_bin}|g" \
+            -e "s|<CLOUDFLARED_BIN>|${cloudflared_bin}|g" \
+            "$launchd_src/$plist" > "$dest"
+        info "  $plist → $dest"
+    done
+
+    warn "plist 설치 완료. 'deploy.sh start'로 서비스를 시작하세요."
+    warn "pyapi plist의 환경변수는 직접 편집이 필요할 수 있습니다:"
+    warn "  $launch_agents/com.d2trader.pyapi.plist"
 }
 
 # ── Next.js 빌드 ──
@@ -84,6 +125,33 @@ cmd_build() {
 cmd_start() {
     info "D2trader 서비스 시작..."
 
+    if [ "$OS" = "Darwin" ]; then
+        _start_macos
+    else
+        _start_linux
+    fi
+}
+
+_start_macos() {
+    local launch_agents="$HOME/Library/LaunchAgents"
+
+    for plist in com.d2trader.pyapi.plist com.d2trader.nextjs.plist com.d2trader.tunnel.plist; do
+        local dest="$launch_agents/$plist"
+        if [ ! -f "$dest" ]; then
+            warn "$plist 미설치. 먼저 'deploy.sh setup'을 실행하세요."
+            continue
+        fi
+        local label="${plist%.plist}"
+        if launchctl list "$label" &>/dev/null; then
+            info "$label 이미 실행 중"
+        else
+            launchctl load "$dest"
+            info "$label 시작됨"
+        fi
+    done
+}
+
+_start_linux() {
     # Python API
     if systemctl is-active --quiet d2trader-pyapi 2>/dev/null; then
         info "Python API 이미 실행 중"
@@ -125,6 +193,27 @@ cmd_start() {
 cmd_stop() {
     info "D2trader 서비스 중지..."
 
+    if [ "$OS" = "Darwin" ]; then
+        _stop_macos
+    else
+        _stop_linux
+    fi
+}
+
+_stop_macos() {
+    local launch_agents="$HOME/Library/LaunchAgents"
+
+    for plist in com.d2trader.tunnel.plist com.d2trader.nextjs.plist com.d2trader.pyapi.plist; do
+        local dest="$launch_agents/$plist"
+        local label="${plist%.plist}"
+        if launchctl list "$label" &>/dev/null; then
+            launchctl unload "$dest"
+            info "$label 중지됨"
+        fi
+    done
+}
+
+_stop_linux() {
     if systemctl is-active --quiet d2trader-pyapi 2>/dev/null; then
         sudo systemctl stop d2trader-pyapi
         info "Python API 중지됨"
@@ -144,6 +233,43 @@ cmd_status() {
     echo "=== D2trader 서비스 상태 ==="
     echo ""
 
+    if [ "$OS" = "Darwin" ]; then
+        _status_macos
+    else
+        _status_linux
+    fi
+}
+
+_status_macos() {
+    # launchd 서비스 목록
+    echo "launchd 서비스:"
+    launchctl list | grep d2trader || echo "  (등록된 d2trader 서비스 없음)"
+    echo ""
+
+    # HTTP health check
+    echo -n "Python API (port 8000): "
+    if curl -sf http://localhost:8000/py/health > /dev/null 2>&1; then
+        echo -e "${GREEN}Running${NC}"
+    else
+        echo -e "${RED}Stopped${NC}"
+    fi
+
+    echo -n "Next.js (port 3000):    "
+    if curl -sf http://localhost:3000 > /dev/null 2>&1; then
+        echo -e "${GREEN}Running${NC}"
+    else
+        echo -e "${RED}Stopped${NC}"
+    fi
+
+    echo -n "Cloudflare Tunnel:      "
+    if pgrep -f cloudflared > /dev/null 2>&1; then
+        echo -e "${GREEN}Running${NC}"
+    else
+        echo -e "${RED}Stopped${NC}"
+    fi
+}
+
+_status_linux() {
     # Python API
     echo -n "Python API (port 8000): "
     if curl -s http://localhost:8000/py/health > /dev/null 2>&1; then
@@ -174,10 +300,32 @@ cmd_status() {
 # ── 로그 확인 ──
 cmd_logs() {
     local service="${1:-pyapi}"
+
+    if [ "$OS" = "Darwin" ]; then
+        _logs_macos "$service"
+    else
+        _logs_linux "$service"
+    fi
+}
+
+_logs_macos() {
+    local service="$1"
+    local log_dir="$HOME/Library/Logs/d2trader"
+    case "$service" in
+        pyapi)  tail -f "$log_dir/pyapi.stdout.log" "$log_dir/pyapi.stderr.log" ;;
+        nextjs) tail -f "$log_dir/nextjs.stdout.log" "$log_dir/nextjs.stderr.log" ;;
+        tunnel) tail -f "$log_dir/tunnel.stdout.log" "$log_dir/tunnel.stderr.log" ;;
+        *)      error "사용법: deploy.sh logs [pyapi|nextjs|tunnel]" ;;
+    esac
+}
+
+_logs_linux() {
+    local service="$1"
     case "$service" in
         pyapi)   sudo journalctl -u d2trader-pyapi -f --no-pager ;;
         tunnel)  sudo journalctl -u d2trader-tunnel -f --no-pager ;;
-        *)       error "사용법: deploy.sh logs [pyapi|tunnel]" ;;
+        nextjs)  error "Linux에서 Next.js 로그는 systemd로 관리되지 않습니다." ;;
+        *)       error "사용법: deploy.sh logs [pyapi|nextjs|tunnel]" ;;
     esac
 }
 
@@ -197,7 +345,7 @@ case "${1:-}" in
         echo "  start   전체 서비스 시작"
         echo "  stop    전체 서비스 중지"
         echo "  status  서비스 상태 확인"
-        echo "  logs    로그 확인 (pyapi|tunnel)"
+        echo "  logs    로그 확인 (pyapi|nextjs|tunnel)"
         exit 1
         ;;
 esac
