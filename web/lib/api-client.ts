@@ -73,13 +73,19 @@ async function fetchCached<T>(
 export const getPortfolio = () =>
   fetchCached("/portfolio", CACHE_TTL.PORTFOLIO);
 export const getCapital = () => fetchApi("/portfolio/capital");
-export const setCapital = (amount: number) =>
-  fetchApi("/portfolio/capital", {
+export const setCapital = async (amount: number) => {
+  const res = await fetchApi("/portfolio/capital", {
     method: "POST",
     body: JSON.stringify({ amount }),
   });
-export const resetPortfolio = () =>
-  fetchApi("/portfolio/reset", { method: "POST" });
+  invalidateCache("/portfolio");
+  return res;
+};
+export const resetPortfolio = async () => {
+  const res = await fetchApi("/portfolio/reset", { method: "POST" });
+  invalidateCache("/portfolio");
+  return res;
+};
 
 // Benchmark
 export const getBenchmark = (period = "3M") =>

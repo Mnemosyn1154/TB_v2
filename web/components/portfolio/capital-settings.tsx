@@ -27,12 +27,22 @@ export function CapitalSettings({
   cash,
   onUpdate,
 }: CapitalSettingsProps) {
-  const [amount, setAmount] = useState(initialCapital.toString());
+  const formatWithCommas = (n: number) => n.toLocaleString("en-US");
+  const parseRaw = (s: string) => s.replace(/,/g, "");
+
+  const [display, setDisplay] = useState(formatWithCommas(initialCapital));
   const [loading, setLoading] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
 
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = parseRaw(e.target.value);
+    if (raw === "" || /^\d+$/.test(raw)) {
+      setDisplay(raw === "" ? "" : formatWithCommas(Number(raw)));
+    }
+  };
+
   const handleSetCapital = async () => {
-    const value = parseFloat(amount);
+    const value = Number(parseRaw(display));
     if (isNaN(value) || value <= 0) return;
 
     setLoading(true);
@@ -68,9 +78,10 @@ export function CapitalSettings({
       </div>
       <div className="flex items-center gap-2">
         <Input
-          type="number"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          type="text"
+          inputMode="numeric"
+          value={display}
+          onChange={handleAmountChange}
           className="h-8 w-40 text-sm"
           placeholder="자본금 (원)"
         />

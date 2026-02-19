@@ -11,7 +11,7 @@ from datetime import datetime
 
 from loguru import logger
 
-from src.core.config import get_config, load_env
+from src.core.config import get_config, load_env, reload_config
 from src.core.risk_manager import RiskManager
 from src.strategies import STRATEGY_REGISTRY
 from src.strategies.base import BaseStrategy
@@ -19,7 +19,7 @@ from src.strategies.base import BaseStrategy
 
 def _build_strategies() -> list[BaseStrategy]:
     """STRATEGY_REGISTRY에서 활성 전략 인스턴스를 생성합니다."""
-    config = get_config()
+    config = reload_config()
     strategies: list[BaseStrategy] = []
     for config_key, StrategyCls in STRATEGY_REGISTRY.items():
         if config["strategies"][config_key]["enabled"]:

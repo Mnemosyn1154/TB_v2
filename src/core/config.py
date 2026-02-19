@@ -145,3 +145,10 @@ def get_config() -> dict[str, Any]:
     if _config is None:
         _config = load_config()
     return _config
+
+
+def reload_config() -> dict[str, Any]:
+    """설정 캐시를 무효화하고 settings.yaml을 다시 읽음"""
+    global _config
+    _config = load_config()
+    return _config
