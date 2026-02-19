@@ -1,6 +1,6 @@
 # Project Status
 
-최종 업데이트: 2026-02-18
+최종 업데이트: 2026-02-19
 
 ## 구현 단계 상태
 
@@ -28,11 +28,16 @@
 - 백테스트 엔진 (3개 전략, yfinance 기반, inf/NaN 안전 직렬화)
 - 백테스트 실행 로그 (전략별 사람이 읽을 수 있는 요약)
 - 전략 인스턴스 CRUD (웹에서 전략 생성/삭제)
-- 전략 파라미터 편집 (숫자/문자열 + pairs + universe_codes)
+- 전략 파라미터 편집 (숫자/문자열 + pairs + universe_codes + sectors)
 - 동적 전략 UI (settings.yaml 변경 자동 반영)
-- 페이퍼 트레이딩 에러 핸들링 (세션별 오류 분리)
-- 벤치마크 데이터 DB 캐싱 (SQLite 우선, yfinance 보충)
-- 시뮬레이션 모드 (SQLite 기반 가상 포트폴리오 영속 관리)
+- 페이퍼 트레이딩 에러 핸들링 (세션별 오류 분리, 잔고 추적 + 초과 매수 차단)
+- 벤치마크 데이터 DB 캐싱 (SQLite 우선, yfinance 보충) + 포트폴리오 시계열 연동
+- 시뮬레이션 모드 (SQLite 기반 가상 포트폴리오, 기본 ON)
+  - 실주문 차단 가드, DB 트랜잭션, 포지션 가격 갱신, 일별 스냅샷
+  - RiskManager initial_capital fallback, 시그널 프리뷰 예상 수량/가격
+- 대시보드 UX: 토스트 에러 알림, bot/run 후 캐시 자동 무효화
+- 장 운영시간 체크 (KR/US), 데이터 신선도 경고
+- 테스트: 49 tests (시뮬레이션 E2E + 전략 유닛)
 - 다크 모드 (기본값)
 - Cloudflare Pages + Tunnel 배포 파이프라인
 
@@ -41,28 +46,37 @@
 | 항목 | 상태 | 비고 |
 |------|------|------|
 | quant_factor 전략 | disabled | settings.yaml에서 `enabled: false` |
-| 테스트 | 미구현 | 테스트 플랜만 작성됨 (docs/TEST_PLAN.md) |
+| sam_hynix 인스턴스 | disabled | 삼성전자/SK하이닉스 KR 페어, `enabled: false` |
 | Settings API | Next.js 직접 처리 | Python API 라우터 없음, settings.yaml 직접 읽기/쓰기 |
-| 시뮬레이션 모드 | 구현됨 (기본 OFF) | `simulation.enabled: false` — 수동 활성화 필요 |
 
 ## 활성 전략 (settings.yaml 기준)
 
-| 전략 | 상태 | 주요 설정 |
-|------|------|----------|
-| stat_arb | ENABLED | MSFT_GOOGL US 페어 (인스턴스 분리 가능) |
-| dual_momentum | ENABLED | KR/US ETF 페어, 월 1일 리밸런싱 |
-| quant_factor | DISABLED | 멀티팩터 스코어링, 20+ 종목 유니버스 |
+| 전략 | config_key | 상태 | 주요 설정 |
+|------|-----------|------|----------|
+| stat_arb | `stat_arb` | ENABLED | 4 US 페어 (KO_PEP, XOM_CVX, V_MA, MSFT_GOOGL), coint_pvalue=0.1 |
+| dual_momentum | `dual_momentum` | ENABLED | KR(069500)/US(SPY) ETF, 월 1일 리밸런싱 |
+| sector_rotation | `sector_rotation` | ENABLED | US 7섹터 + KR 3섹터 ETF, top_n=3, 6개월 룩백 |
+| quant_factor | `quant_factor` | DISABLED | 멀티팩터 스코어링, KR 25 + US 15 = 40종목 유니버스 |
+| sam_hynix | `sam_hynix` | DISABLED | stat_arb 타입, 삼성전자/SK하이닉스 KR 페어 |
 
-## 최근 주요 변경 (2026-02-18)
+## 최근 주요 변경
 
-1. **벤치마크 DB 캐싱 (PR #10)**: 벤치마크 데이터를 Python API로 이전, SQLite 캐시 + yfinance 보충. Next.js에서 yahoo-finance2 직접 호출 제거.
-2. **시뮬레이션 모드 (PR #11)**: `PortfolioTracker`(SQLite)로 가상 포트폴리오 영속 관리, `OrderExecutor` 시뮬레이션 분기, 자본금 설정/리셋 UI 추가.
-3. **전략 파라미터 편집 확장**: pairs, universe_codes, 문자열 파라미터(ETF 코드 등) 편집 가능
-4. **백테스트 안정화**: inf/NaN 안전 직렬화 (`_SafeEncoder`), null-safe KPI 표시
-5. **백테스트 실행 로그**: 전략별 사람이 읽을 수 있는 요약 메시지 (공적분 결과, 모멘텀 비교 등)
-6. **거래 내역 개선**: 총 매매금액(amount) 컬럼 추가
-7. **페이퍼 트레이딩**: 세션별 에러 핸들링 개선 (PR #9)
-8. **전략 인스턴스 CRUD**: 웹 UI에서 전략 생성/삭제 가능
-9. **동적 전략 UI**: 하드코딩 전략명 제거, settings.yaml에서 동적 로딩
-10. **다크 모드 가시성**: OKLCH lightness 조정으로 대비 개선
-11. **코드 리뷰 P0 수정**: 보안, 성능, 비동기 관련 5개 크리티컬 이슈 해결
+### 2026-02-19: 시뮬레이션 이슈 수정 (Phase 1–4)
+
+1. **Phase 1 — 시뮬레이션 필수 수정** (`ce32db9`): 3중 버그(수량 0/가격 0) 해결, 실주문 차단 가드, 포지션 가격 갱신, 전략 경고 로그
+2. **Phase 2 — 페이퍼 트레이딩 & 데이터 신뢰성** (`95e4937`): 세션 잔고 추적, 장 운영시간 체크, 데이터 신선도 경고
+3. **Phase 3 — 대시보드 UX 개선** (`3984203`): 캐시 무효화, 토스트 에러 알림, 벤치마크 포트폴리오 시계열 연동
+4. **Phase 4 — 안정성 & 테스트** (`e637900`): DB 트랜잭션, 시뮬레이션 E2E 테스트 13건, 전략 유닛 테스트 36건
+5. **전략 설정 확장**: stat_arb 4페어(KO_PEP, XOM_CVX, V_MA, MSFT_GOOGL), sector_rotation 신규, quant_factor 유니버스 40종목, sam_hynix KR 페어 인스턴스
+
+상세: `docs/SIMULATION_ISSUES.md` 참조
+
+### 2026-02-18: 기능 구현 완료
+
+1. **벤치마크 DB 캐싱 (PR #10)**: 벤치마크 데이터를 Python API로 이전, SQLite 캐시 + yfinance 보충
+2. **시뮬레이션 모드 (PR #11)**: `PortfolioTracker`(SQLite)로 가상 포트폴리오 영속 관리
+3. **전략 파라미터 편집 확장**: pairs, universe_codes, 문자열 파라미터 편집 가능
+4. **백테스트 안정화**: inf/NaN 안전 직렬화, null-safe KPI, 실행 로그
+5. **전략 인스턴스 CRUD**: 웹 UI에서 전략 생성/삭제 가능
+6. **동적 전략 UI**: settings.yaml에서 동적 로딩
+7. **코드 리뷰 P0 수정**: 보안, 성능, 비동기 관련 5개 크리티컬 이슈 해결
