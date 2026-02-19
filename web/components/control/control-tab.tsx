@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import {
   useKillSwitch,
   useBotExecution,
+  useScheduler,
   useTradingMode,
   useLogViewer,
 } from "@/hooks/use-control";
@@ -20,6 +21,7 @@ interface ControlTabProps {
 export function ControlTab({ onModeChange }: ControlTabProps) {
   const killSwitch = useKillSwitch();
   const execution = useBotExecution();
+  const scheduler = useScheduler();
   const { mode, switchMode } = useTradingMode();
   const { logs, addLog, clearLogs } = useLogViewer(
     execution.running || execution.collecting
@@ -64,6 +66,13 @@ export function ControlTab({ onModeChange }: ControlTabProps) {
     addLog("INFO", `Kill Switch ${action} 완료`);
   };
 
+  const handleSchedulerToggle = async () => {
+    const action = scheduler.status?.running ? "중지" : "시작";
+    addLog("INFO", `스케줄러 ${action} 요청...`);
+    await scheduler.toggle();
+    addLog("INFO", `스케줄러 ${action} 완료`);
+  };
+
   if (killSwitch.loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -92,6 +101,9 @@ export function ControlTab({ onModeChange }: ControlTabProps) {
           lastResult={execution.lastResult}
           onRun={handleRun}
           onCollect={handleCollect}
+          scheduler={scheduler.status}
+          schedulerToggling={scheduler.toggling}
+          onSchedulerToggle={handleSchedulerToggle}
         />
       </div>
 

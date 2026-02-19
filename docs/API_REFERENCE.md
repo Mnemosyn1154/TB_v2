@@ -71,11 +71,30 @@
 |--------|------|------|
 | POST | `/py/bot/collect` | 데이터 수집 실행 |
 | POST | `/py/bot/run` | 전략 1회 실행 (수집 → 분석 → 매매) |
+| GET | `/py/bot/status` | 봇 통합 상태 (킬스위치 + 스케줄러) |
 | GET | `/py/bot/kill-switch` | 킬스위치 상태 조회 |
 | POST | `/py/bot/kill-switch/activate` | 킬스위치 활성화 (매매 중단) |
 | POST | `/py/bot/kill-switch/deactivate` | 킬스위치 비활성화 |
+| POST | `/py/bot/scheduler/start` | 스케줄러 시작 (15분 주기 자동 실행) |
+| POST | `/py/bot/scheduler/stop` | 스케줄러 중지 |
 
 Bot 실행 응답: `{ "data": { "log": "실행 로그 문자열" }, "error": null }`
+
+Bot 상태 응답:
+```json
+{
+  "data": {
+    "kill_switch": false,
+    "scheduler": {
+      "running": true,
+      "interval_minutes": 15,
+      "next_run": "2026-02-19T09:15:00+09:00",
+      "last_run": { "time": "...", "status": "success", "total_signals": 3 }
+    }
+  },
+  "error": null
+}
+```
 
 ### Signals
 
@@ -142,6 +161,7 @@ Bot 실행 응답: `{ "data": { "log": "실행 로그 문자열" }, "error": nul
 | `/api/bot/collect` | POST | `/py/bot/collect` |
 | `/api/bot/kill-switch` | GET | `/py/bot/kill-switch` |
 | `/api/bot/kill-switch` | POST | `/py/bot/kill-switch/{action}` |
+| `/api/bot/scheduler` | POST | `/py/bot/scheduler/{action}` |
 | `/api/paper/sessions` | GET/POST | `/py/paper/sessions` |
 | `/api/paper/sessions/active` | GET | `/py/paper/sessions/active` |
 | `/api/paper/sessions/[id]/summary` | GET | `/py/paper/sessions/{id}/summary` |
@@ -191,6 +211,7 @@ collectData()
 getKillSwitch()
 toggleKillSwitch(action: "activate" | "deactivate")
 getBotStatus()
+toggleScheduler(action: "start" | "stop")
 
 // Signals
 getSignals()

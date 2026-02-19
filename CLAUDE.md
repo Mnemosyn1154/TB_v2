@@ -107,7 +107,8 @@ TB_v2/
 │   ├── backtest/            # 백테스트 엔진 + 성과 분석
 │   └── utils/               # 로거(loguru), 텔레그램 알림
 ├── pyapi/                   # FastAPI 서버 (src/ 래핑)
-│   ├── main.py              # FastAPI 앱 (CORS, 라우터 등록)
+│   ├── main.py              # FastAPI 앱 (CORS, 라우터 등록, lifespan 스케줄러)
+│   ├── scheduler.py         # APScheduler 래퍼 (start/stop/status, 장중 체크)
 │   ├── routers/             # portfolio, backtest, bot, signals, paper, benchmark
 │   ├── deps.py              # verify_secret (X-Internal-Secret 검증)
 │   └── schemas.py           # BacktestRequest, ExecuteRequest
@@ -188,6 +189,7 @@ python3 main.py backtest-yf -s stat_arb --start 2020-01-01 --end 2024-12-31
 - **Phase 1-9**: 모두 구현 완료 (docs/mainplan.md 참조)
 - **시뮬레이션 이슈 Phase 1-4**: 모두 수정 완료 (docs/SIMULATION_ISSUES.md 참조)
 - **벤치마크 탭**: Python API 경유 DB 캐시 + yfinance 보충 + 포트폴리오 시계열 연동
+- **APScheduler**: 15분 주기 자동 전략 실행 (`scheduler.enabled`, 장중에만 실행, 킬스위치 연동)
 - **시뮬레이션 모드**: SQLite 기반 가상 포트폴리오 (기본 ON, `simulation.enabled` 토글)
   - 실주문 차단 가드, DB 트랜잭션, 포지션 가격 갱신, 스냅샷 기록
 - **Python 3.12**: pyenv로 3.12.12 사용 (`.python-version`), 3.10+ 타입 문법 지원

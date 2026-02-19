@@ -71,6 +71,10 @@ strategies:
       value: 0.3
       quality: 0.3
       momentum: 0.4
+    absolute_momentum_filter: true
+    abs_mom_threshold: 0.0
+    safe_asset: SHY
+    safe_asset_exchange: NYS
     universe_codes:
       - code: '005930'
         market: KR
@@ -299,6 +303,11 @@ risk:
   max_drawdown_pct: -10
   max_positions: 10
   min_cash_pct: 20
+  strategy_allocation:
+    stat_arb: 0.30
+    dual_momentum: 0.20
+    quant_factor: 0.40
+    sector_rotation: 0.10
 notifications:
   telegram:
     enabled: true
@@ -317,6 +326,8 @@ logging:
   rotation: 10 MB
   retention: 30 days
 scheduler:
+  enabled: false
+  interval_minutes: 15
   kr_market_open: '09:00'
   kr_market_close: '15:30'
   us_market_open: '09:30'

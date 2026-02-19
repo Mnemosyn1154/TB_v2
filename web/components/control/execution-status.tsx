@@ -1,8 +1,19 @@
 "use client";
 
-import { Play, Download, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import {
+  Play,
+  Download,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Timer,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import type { SchedulerStatus } from "@/types/control";
 
 interface ExecutionStatusProps {
   running: boolean;
@@ -16,6 +27,41 @@ interface ExecutionStatusProps {
   } | null;
   onRun: () => void;
   onCollect: () => void;
+  scheduler: SchedulerStatus | null;
+  schedulerToggling: boolean;
+  onSchedulerToggle: () => void;
+}
+
+function formatTime(isoString: string): string {
+  return new Date(isoString).toLocaleString("ko-KR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function SchedulerLastRunInfo({ lastRun }: { lastRun: SchedulerStatus["last_run"] }) {
+  if (!lastRun) return null;
+
+  const statusLabel =
+    lastRun.status === "success"
+      ? `성공 (시그널 ${lastRun.total_signals ?? 0}건)`
+      : lastRun.status === "skipped"
+        ? `스킵 (${lastRun.reason === "kill_switch" ? "킬스위치" : "장외시간"})`
+        : `오류: ${lastRun.error ?? "알 수 없음"}`;
+
+  const colorClass =
+    lastRun.status === "success"
+      ? "text-green-600 dark:text-green-400"
+      : lastRun.status === "skipped"
+        ? "text-yellow-600 dark:text-yellow-400"
+        : "text-red-600 dark:text-red-400";
+
+  return (
+    <p className={`text-xs ${colorClass}`}>
+      마지막 실행: {formatTime(lastRun.time)} — {statusLabel}
+    </p>
+  );
 }
 
 export function ExecutionStatus({
@@ -25,6 +71,9 @@ export function ExecutionStatus({
   lastResult,
   onRun,
   onCollect,
+  scheduler,
+  schedulerToggling,
+  onSchedulerToggle,
 }: ExecutionStatusProps) {
   const busy = running || collecting;
 
@@ -68,6 +117,36 @@ export function ExecutionStatus({
             Kill Switch가 활성화되어 실행이 차단됩니다
           </p>
         )}
+
+        {/* Scheduler controls */}
+        <div className="flex flex-col gap-2 rounded-md border p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Timer className="h-4 w-4 text-muted-foreground" />
+              <Label htmlFor="scheduler-toggle" className="text-sm font-medium">
+                자동 실행 (스케줄러)
+              </Label>
+            </div>
+            <Switch
+              id="scheduler-toggle"
+              checked={scheduler?.running ?? false}
+              onCheckedChange={onSchedulerToggle}
+              disabled={schedulerToggling || killSwitchActive}
+            />
+          </div>
+          {scheduler && (
+            <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+              {scheduler.running && scheduler.next_run && (
+                <p className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  다음 실행: {formatTime(scheduler.next_run)}
+                  {scheduler.interval_minutes && ` (${scheduler.interval_minutes}분 간격)`}
+                </p>
+              )}
+              <SchedulerLastRunInfo lastRun={scheduler.last_run} />
+            </div>
+          )}
+        </div>
 
         {lastResult && (
           <div

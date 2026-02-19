@@ -1,22 +1,28 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { getKillSwitch } from "@/lib/api-client";
+import { getBotStatus } from "@/lib/api-client";
 import type { ApiResponse } from "@/types/common";
+import type { FullBotStatus, SchedulerStatus } from "@/types/control";
 
-interface BotStatus {
+interface BotStatusResult {
   kill_switch: boolean;
   mode: "live" | "paper" | "idle";
+  scheduler: SchedulerStatus | null;
 }
 
 export function useBotStatus() {
-  const [status, setStatus] = useState<BotStatus | null>(null);
+  const [status, setStatus] = useState<BotStatusResult | null>(null);
 
   const fetch = useCallback(async () => {
     try {
-      const res = (await getKillSwitch()) as ApiResponse<BotStatus>;
+      const res = (await getBotStatus()) as ApiResponse<FullBotStatus>;
       if (res.data) {
-        setStatus(res.data);
+        setStatus({
+          kill_switch: res.data.kill_switch,
+          mode: "idle",
+          scheduler: res.data.scheduler,
+        });
       }
     } catch {
       // silently fail - header indicator is non-critical

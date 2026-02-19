@@ -195,7 +195,7 @@ risk:                         # 리스크 관리
 notifications:                # 텔레그램 알림
 database:                     # SQLite 경로
 logging:                      # loguru 설정
-scheduler:                    # 한국/미국 장 시간
+scheduler:                    # APScheduler 자동 실행 (enabled, interval_minutes, 장 시간)
 backtest:                     # 초기 자본, 수수료율, 세율, 슬리피지
 ```
 

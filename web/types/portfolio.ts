@@ -10,6 +10,12 @@ export interface Position {
   strategy?: string;
 }
 
+export interface StrategyAllocationInfo {
+  allocated_pct: number;
+  used_pct: number;
+  remaining: number;
+}
+
 export interface RiskSummary {
   total_equity: number;
   cash: number;
@@ -20,6 +26,7 @@ export interface RiskSummary {
   max_positions: number;
   kill_switch: boolean;
   positions: { code: string; side: string; pnl_pct: string; value: number }[];
+  strategy_allocation?: Record<string, StrategyAllocationInfo>;
 }
 
 export interface StrategyStatus {

@@ -28,6 +28,7 @@ import {
   snakeToTitle,
   extractNumericParams,
   extractStringParams,
+  extractBooleanParams,
   summarizeConfig,
 } from "@/lib/strategy-utils";
 
@@ -83,6 +84,7 @@ export function StrategyCard({
     {}
   );
   const [stringValues, setStringValues] = useState<Record<string, string>>({});
+  const [booleanValues, setBooleanValues] = useState<Record<string, boolean>>({});
   const [pairs, setPairs] = useState<Pair[]>([]);
   const [codes, setCodes] = useState<UniverseCode[]>([]);
 
@@ -93,6 +95,7 @@ export function StrategyCard({
 
   const numericParams = extractNumericParams(config);
   const stringParams = extractStringParams(config);
+  const booleanParams = extractBooleanParams(config);
 
   function initEditing() {
     const numInit: Record<string, number> = {};
@@ -102,6 +105,10 @@ export function StrategyCard({
     const strInit: Record<string, string> = {};
     for (const p of stringParams) strInit[p.field] = p.value;
     setStringValues(strInit);
+
+    const boolInit: Record<string, boolean> = {};
+    for (const p of booleanParams) boolInit[p.field] = p.value;
+    setBooleanValues(boolInit);
 
     if (Array.isArray(config.pairs)) {
       setPairs((config.pairs as Pair[]).map((p) => ({ ...p })));
@@ -134,6 +141,7 @@ export function StrategyCard({
     const updated = { ...config };
     for (const [k, v] of Object.entries(numericValues)) updated[k] = v;
     for (const [k, v] of Object.entries(stringValues)) updated[k] = v;
+    for (const [k, v] of Object.entries(booleanValues)) updated[k] = v;
     if (hasPairs) updated.pairs = pairs;
     if (hasCodes) updated.universe_codes = codes;
     onSave(strategyKey, updated);
@@ -222,6 +230,25 @@ export function StrategyCard({
                 <div key={p.field} className="flex justify-between text-sm">
                   <span className="text-muted-foreground">{p.label}</span>
                   <span className="font-mono">{p.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Boolean parameters */}
+        {booleanParams.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <h4 className="text-sm font-medium text-muted-foreground">
+              옵션
+            </h4>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+              {booleanParams.map((p) => (
+                <div key={p.field} className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">{p.label}</span>
+                  <Badge variant={p.value ? "default" : "secondary"} className="text-xs">
+                    {p.value ? "ON" : "OFF"}
+                  </Badge>
                 </div>
               ))}
             </div>
@@ -384,6 +411,34 @@ export function StrategyCard({
                       setStringValues((prev) => ({
                         ...prev,
                         [p.field]: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Boolean parameters */}
+        {booleanParams.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <h4 className="text-sm font-medium text-muted-foreground">
+              옵션
+            </h4>
+            <div className="flex flex-col gap-2">
+              {booleanParams.map((p) => (
+                <div key={p.field} className="flex items-center justify-between">
+                  <Label htmlFor={`${strategyKey}-${p.field}`} className="text-sm">
+                    {p.label}
+                  </Label>
+                  <Switch
+                    id={`${strategyKey}-${p.field}`}
+                    checked={booleanValues[p.field] ?? false}
+                    onCheckedChange={(checked) =>
+                      setBooleanValues((prev) => ({
+                        ...prev,
+                        [p.field]: checked,
                       }))
                     }
                   />

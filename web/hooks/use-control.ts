@@ -7,11 +7,19 @@ import {
   getKillSwitch,
   toggleKillSwitch,
   getBotStatus,
+  toggleScheduler,
   runBot,
   collectData,
   invalidateCache,
 } from "@/lib/api-client";
-import type { KillSwitchStatus, BotStatus, TradingMode, LogEntry } from "@/types/control";
+import type {
+  KillSwitchStatus,
+  BotStatus,
+  TradingMode,
+  LogEntry,
+  FullBotStatus,
+  SchedulerStatus,
+} from "@/types/control";
 import type { ApiResponse } from "@/types/common";
 
 export function useKillSwitch() {
@@ -116,6 +124,48 @@ export function useBotExecution() {
     lastResult,
     executeRun,
     executeCollect,
+  };
+}
+
+export function useScheduler() {
+  const [status, setStatus] = useState<SchedulerStatus | null>(null);
+  const [toggling, setToggling] = useState(false);
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      const res = (await getBotStatus()) as ApiResponse<FullBotStatus>;
+      if (res.data?.scheduler) {
+        setStatus(res.data.scheduler);
+      }
+    } catch {
+      // silently fail
+    }
+  }, []);
+
+  // Poll every 30s
+  useInterval(fetchStatus, 30_000);
+
+  const toggle = useCallback(async () => {
+    if (!status) return;
+    setToggling(true);
+    try {
+      const action = status.running ? "stop" : "start";
+      const res = (await toggleScheduler(action)) as ApiResponse<SchedulerStatus>;
+      if (res.data) {
+        setStatus(res.data);
+      } else {
+        await fetchStatus();
+      }
+    } finally {
+      setToggling(false);
+    }
+  }, [status, fetchStatus]);
+
+  return {
+    status,
+    toggling,
+    toggle,
+    refetch: fetchStatus,
   };
 }
 

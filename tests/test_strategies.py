@@ -410,6 +410,99 @@ class TestQuantFactor:
 
 
 # ──────────────────────────────────────────────
+# QuantFactor — Absolute Momentum Filter
+# ──────────────────────────────────────────────
+
+QUANT_FACTOR_ABS_MOM_CONFIG = {
+    "simulation": {"enabled": True, "initial_capital": 10_000_000},
+    "strategies": {
+        "quant_factor": {
+            "enabled": True,
+            "top_n": 2,
+            "rebalance_months": 1,
+            "lookback_days": 252,
+            "momentum_days": 126,
+            "volatility_days": 60,
+            "min_data_days": 60,
+            "weights": {"value": 0.3, "quality": 0.3, "momentum": 0.4},
+            "absolute_momentum_filter": True,
+            "abs_mom_threshold": 0.0,
+            "safe_asset": "SHY",
+            "safe_asset_exchange": "NYS",
+            "universe_codes": [
+                {"code": "A", "market": "US"},
+                {"code": "B", "market": "US"},
+                {"code": "C", "market": "US"},
+                {"code": "D", "market": "KR"},
+            ],
+        },
+    },
+}
+
+
+class TestQuantFactorAbsoluteMomentum:
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        with patch("src.strategies.quant_factor.get_config", return_value=QUANT_FACTOR_ABS_MOM_CONFIG):
+            from src.strategies.quant_factor import QuantFactorStrategy
+            self.strategy = QuantFactorStrategy()
+
+    def test_init_filter_params(self):
+        """절대 모멘텀 필터 파라미터 로딩 확인"""
+        assert self.strategy.absolute_momentum_filter is True
+        assert self.strategy.abs_mom_threshold == 0.0
+        assert self.strategy.safe_asset == "SHY"
+        assert self.strategy.safe_asset_exchange == "NYS"
+
+    def test_required_codes_includes_safe_asset(self):
+        """필터 활성 시 required_codes에 안전자산 포함"""
+        codes = self.strategy.required_codes()
+        code_set = {c["code"] for c in codes}
+        assert "SHY" in code_set
+
+    def test_get_market_safe_asset(self):
+        """안전자산 코드의 시장은 US"""
+        assert self.strategy._get_market("SHY") == "US"
+
+    def test_composite_scores_preserve_raw_momentum(self):
+        """_calculate_composite_scores 결과에 raw_momentum 키 존재"""
+        price_data = {
+            "A": _make_stock_prices(n=200, trend=0.002, vol=0.01, seed=0),
+            "B": _make_stock_prices(n=200, trend=0.001, vol=0.02, seed=1),
+        }
+        scores = self.strategy._calculate_composite_scores(price_data)
+        assert len(scores) == 2
+        for code in scores:
+            assert "raw_momentum" in scores[code]
+
+    def test_filter_replaces_low_momentum_with_safe(self):
+        """하락 추세 종목이 안전자산으로 대체됨"""
+        price_data = {
+            "A": _make_stock_prices(n=200, trend=-0.002, vol=0.01, seed=0),  # 하락
+            "B": _make_stock_prices(n=200, trend=-0.003, vol=0.02, seed=1),  # 하락
+            "C": _make_stock_prices(n=200, trend=-0.001, vol=0.03, seed=2),  # 하락
+            "D": _make_stock_prices(n=200, trend=-0.004, vol=0.04, seed=3),  # 하락
+        }
+        signals = self.strategy.generate_signals(price_data=price_data)
+        buy_codes = {s.code for s in signals if s.signal == Signal.BUY}
+        # 모든 종목이 음수 모멘텀 → 안전자산 대체
+        assert "SHY" in buy_codes
+
+    def test_filter_disabled_no_replacement(self):
+        """필터 비활성 시 안전자산 대체 없음"""
+        self.strategy.absolute_momentum_filter = False
+        price_data = {
+            "A": _make_stock_prices(n=200, trend=-0.002, vol=0.01, seed=0),
+            "B": _make_stock_prices(n=200, trend=-0.003, vol=0.02, seed=1),
+            "C": _make_stock_prices(n=200, trend=-0.001, vol=0.03, seed=2),
+            "D": _make_stock_prices(n=200, trend=-0.004, vol=0.04, seed=3),
+        }
+        signals = self.strategy.generate_signals(price_data=price_data)
+        buy_codes = {s.code for s in signals if s.signal == Signal.BUY}
+        assert "SHY" not in buy_codes
+
+
+# ──────────────────────────────────────────────
 # VolatilityBreakout
 # ──────────────────────────────────────────────
 

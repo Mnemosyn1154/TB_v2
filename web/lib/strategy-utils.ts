@@ -28,6 +28,10 @@ const KNOWN_LABELS: Record<string, string> = {
   safe_kr_etf: "안전자산 KR ETF",
   safe_us_etf: "안전자산 US ETF",
   safe_us_etf_exchange: "안전자산 US ETF 거래소",
+  absolute_momentum_filter: "절대 모멘텀 필터",
+  abs_mom_threshold: "모멘텀 임계값",
+  safe_asset: "안전자산 코드",
+  safe_asset_exchange: "안전자산 거래소",
 };
 
 export function fieldLabel(field: string): string {
@@ -71,6 +75,22 @@ export function extractStringParams(
       field,
       label: fieldLabel(field),
       value: val as string,
+    }));
+}
+
+/** Extract editable boolean params from a strategy config */
+export function extractBooleanParams(
+  config: Record<string, unknown>
+): { field: string; label: string; value: boolean }[] {
+  return Object.entries(config)
+    .filter(
+      ([key, val]) =>
+        typeof val === "boolean" && !EXCLUDED_FIELDS.has(key)
+    )
+    .map(([field, val]) => ({
+      field,
+      label: fieldLabel(field),
+      value: val as boolean,
     }));
 }
 

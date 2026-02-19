@@ -10,13 +10,35 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from loguru import logger
 
 from pyapi.routers import portfolio, backtest, bot, signals, paper, benchmark
 
-app = FastAPI(title="D2trader Python API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    from src.core.config import get_config
+    from pyapi.scheduler import start_scheduler
+
+    config = get_config()
+    sched_cfg = config.get("scheduler", {})
+    if sched_cfg.get("enabled", False):
+        start_scheduler()
+        logger.info("Scheduler auto-started (settings.yaml scheduler.enabled=true)")
+
+    yield
+
+    # Shutdown
+    from pyapi.scheduler import stop_scheduler
+    stop_scheduler()
+
+
+app = FastAPI(title="D2trader Python API", version="0.1.0", lifespan=lifespan)
 
 # CORS — 허용 오리진 설정
 # 환경변수 ALLOWED_ORIGINS로 프로덕션 도메인 추가 가능 (콤마 구분)

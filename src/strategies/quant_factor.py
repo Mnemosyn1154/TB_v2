@@ -71,6 +71,12 @@ class QuantFactorStrategy(BaseStrategy):
         self.weight_quality: float = weights["quality"]
         self.weight_momentum: float = weights["momentum"]
 
+        # 절대 모멘텀 필터
+        self.absolute_momentum_filter: bool = qf_config.get("absolute_momentum_filter", False)
+        self.abs_mom_threshold: float = qf_config.get("abs_mom_threshold", 0.0)
+        self.safe_asset: str = qf_config.get("safe_asset", "SHY")
+        self.safe_asset_exchange: str = qf_config.get("safe_asset_exchange", "")
+
         # 유니버스 종목 코드
         self.universe_codes: list[dict] = qf_config.get("universe_codes", [])
 
@@ -99,6 +105,14 @@ class QuantFactorStrategy(BaseStrategy):
             if item.get("exchange"):
                 entry["exchange"] = item["exchange"]
             result.append(entry)
+
+        # 절대 모멘텀 필터 활성 시 안전자산도 포함
+        if self.absolute_momentum_filter:
+            safe_entry: dict[str, str] = {"code": self.safe_asset, "market": "US"}
+            if self.safe_asset_exchange:
+                safe_entry["exchange"] = self.safe_asset_exchange
+            result.append(safe_entry)
+
         return result
 
     def prepare_signal_kwargs(self, price_data: dict[str, pd.Series]) -> dict:
@@ -181,6 +195,23 @@ class QuantFactorStrategy(BaseStrategy):
                 f"(V={s['value']:.3f}, Q={s['quality']:.3f}, M={s['momentum']:.3f})"
             )
 
+        # 2-1. 절대 모멘텀 필터: raw_momentum < threshold → safe_asset 대체
+        if self.absolute_momentum_filter:
+            filtered_out: list[str] = []
+            for code in list(new_holdings):
+                raw_mom = scores[code].get("raw_momentum", 0.0)
+                if raw_mom < self.abs_mom_threshold:
+                    filtered_out.append(code)
+                    new_holdings.discard(code)
+
+            if filtered_out:
+                new_holdings.add(self.safe_asset)
+                for code in filtered_out:
+                    logger.info(
+                        f"  ⚠️ {code} 원본 모멘텀 {scores[code]['raw_momentum']*100:+.1f}% "
+                        f"< 기준 {self.abs_mom_threshold*100:.1f}% → 안전자산({self.safe_asset}) 대체"
+                    )
+
         # 3. 매매 신호 생성
         signals: list[TradeSignal] = []
 
@@ -231,7 +262,7 @@ class QuantFactorStrategy(BaseStrategy):
 
         Returns:
             {종목코드: {"value": float, "quality": float, "momentum": float,
-                        "composite": float, "rank": int}}
+                        "composite": float, "rank": int, "raw_momentum": float}}
         """
         raw_factors: dict[str, dict] = {}
 
@@ -247,7 +278,13 @@ class QuantFactorStrategy(BaseStrategy):
             return {}
 
         # Z-Score 정규화 (팩터별 상대 순위 기반)
-        return self._normalize_and_rank(raw_factors)
+        result = self._normalize_and_rank(raw_factors)
+
+        # 정규화 전 원본 momentum 값 보존 (절대 모멘텀 필터용)
+        for code in result:
+            result[code]["raw_momentum"] = raw_factors[code]["momentum"]
+
+        return result
 
     def _calculate_factors(self, prices: pd.Series) -> dict[str, float] | None:
         """
@@ -352,6 +389,8 @@ class QuantFactorStrategy(BaseStrategy):
 
     def _get_market(self, code: str) -> str:
         """종목 코드로 시장 판별"""
+        if self.absolute_momentum_filter and code == self.safe_asset:
+            return "US"
         for item in self.universe_codes:
             if item["code"] == code:
                 return item.get("market", "KR")

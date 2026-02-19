@@ -65,7 +65,7 @@ export function PortfolioTab() {
           <h3 className="mb-3 text-sm font-semibold text-muted-foreground">
             전략별 실적
           </h3>
-          <StrategyCards strategies={data.strategies} />
+          <StrategyCards strategies={data.strategies} allocation={data.risk.strategy_allocation} />
         </section>
       )}
 
