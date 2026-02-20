@@ -13,10 +13,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getBacktestPairs, previewUniverse } from "@/lib/api-client";
+import { getBacktestPairs, getSettings, previewUniverse } from "@/lib/api-client";
 import { formatNumber } from "@/lib/formatters";
 import { snakeToTitle } from "@/lib/strategy-utils";
-import type { BacktestRequest, UniverseStock } from "@/types/backtest";
+import type { BacktestRequest, StrategyOverrides, UniverseStock } from "@/types/backtest";
 import type { ApiResponse } from "@/types/common";
 
 interface BacktestFormProps {
@@ -32,6 +32,45 @@ export function BacktestForm({ strategies, onRun, loading }: BacktestFormProps) 
   const [initialCapital, setInitialCapital] = useState(50_000_000);
   const [pairName, setPairName] = useState<string | null>(null);
   const [pairs, setPairs] = useState<string[]>([]);
+
+  // Strategy overrides state (quant_factor defaults)
+  const [overrides, setOverrides] = useState<StrategyOverrides>({
+    top_n: 20,
+    rebalance_months: 1,
+    lookback_days: 252,
+    momentum_days: 126,
+    volatility_days: 60,
+    weight_value: 0.3,
+    weight_quality: 0.3,
+    weight_momentum: 0.4,
+    absolute_momentum_filter: true,
+    abs_mom_threshold: 0,
+  });
+  const [defaultOverrides, setDefaultOverrides] = useState<StrategyOverrides>({});
+
+  // Load defaults from settings.yaml
+  useEffect(() => {
+    getSettings().then((res: ApiResponse<unknown>) => {
+      if (!res.data) return;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cfg = (res.data as any)?.strategies?.quant_factor;
+      if (!cfg) return;
+      const defaults: StrategyOverrides = {
+        top_n: (cfg.top_n as number) ?? 20,
+        rebalance_months: (cfg.rebalance_months as number) ?? 1,
+        lookback_days: (cfg.lookback_days as number) ?? 252,
+        momentum_days: (cfg.momentum_days as number) ?? 126,
+        volatility_days: (cfg.volatility_days as number) ?? 60,
+        weight_value: (cfg.weight_value as number) ?? 0.3,
+        weight_quality: (cfg.weight_quality as number) ?? 0.3,
+        weight_momentum: (cfg.weight_momentum as number) ?? 0.4,
+        absolute_momentum_filter: (cfg.absolute_momentum_filter as boolean) ?? true,
+        abs_mom_threshold: (cfg.abs_mom_threshold as number) ?? 0,
+      };
+      setOverrides(defaults);
+      setDefaultOverrides(defaults);
+    }).catch(() => {});
+  }, []);
 
   // Universe experiment state
   const [universeOpen, setUniverseOpen] = useState(false);
@@ -91,6 +130,18 @@ export function BacktestForm({ strategies, onRun, loading }: BacktestFormProps) 
     }
   };
 
+  const buildOverrides = (): StrategyOverrides | undefined => {
+    if (!isQuantFactor) return undefined;
+    const changed: StrategyOverrides = {};
+    for (const key of Object.keys(overrides) as (keyof StrategyOverrides)[]) {
+      if (overrides[key] !== defaultOverrides[key]) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (changed as any)[key] = overrides[key];
+      }
+    }
+    return Object.keys(changed).length > 0 ? changed : undefined;
+  };
+
   const handleSubmit = () => {
     onRun({
       strategy,
@@ -99,6 +150,7 @@ export function BacktestForm({ strategies, onRun, loading }: BacktestFormProps) 
       initial_capital: initialCapital,
       pair_name: pairName,
       universe_codes: previewStocks ?? undefined,
+      strategy_overrides: buildOverrides(),
     });
   };
 
@@ -232,7 +284,77 @@ export function BacktestForm({ strategies, onRun, loading }: BacktestFormProps) 
             </button>
 
             {universeOpen && (
-              <div className="mt-3 space-y-3">
+              <div className="mt-3 space-y-4">
+                {/* Strategy Parameters */}
+                <div>
+                  <h4 className="text-xs font-medium text-muted-foreground mb-2">전략 파라미터</h4>
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                    <div>
+                      <Label className="mb-1 text-xs">종목 수 (top_n)</Label>
+                      <Input type="number" value={overrides.top_n} min={1} step={1}
+                        onChange={(e) => setOverrides({ ...overrides, top_n: Number(e.target.value) })} />
+                    </div>
+                    <div>
+                      <Label className="mb-1 text-xs">리밸런싱 주기 (개월)</Label>
+                      <Input type="number" value={overrides.rebalance_months} min={1} step={1}
+                        onChange={(e) => setOverrides({ ...overrides, rebalance_months: Number(e.target.value) })} />
+                    </div>
+                    <div>
+                      <Label className="mb-1 text-xs">데이터 기간 (일)</Label>
+                      <Input type="number" value={overrides.lookback_days} min={1} step={1}
+                        onChange={(e) => setOverrides({ ...overrides, lookback_days: Number(e.target.value) })} />
+                    </div>
+                    <div>
+                      <Label className="mb-1 text-xs">모멘텀 기간 (일)</Label>
+                      <Input type="number" value={overrides.momentum_days} min={1} step={1}
+                        onChange={(e) => setOverrides({ ...overrides, momentum_days: Number(e.target.value) })} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4 mt-3">
+                    <div>
+                      <Label className="mb-1 text-xs">가치 가중치</Label>
+                      <Input type="number" value={overrides.weight_value} min={0} max={1} step={0.05}
+                        onChange={(e) => setOverrides({ ...overrides, weight_value: Number(e.target.value) })} />
+                    </div>
+                    <div>
+                      <Label className="mb-1 text-xs">퀄리티 가중치</Label>
+                      <Input type="number" value={overrides.weight_quality} min={0} max={1} step={0.05}
+                        onChange={(e) => setOverrides({ ...overrides, weight_quality: Number(e.target.value) })} />
+                    </div>
+                    <div>
+                      <Label className="mb-1 text-xs">모멘텀 가중치</Label>
+                      <Input type="number" value={overrides.weight_momentum} min={0} max={1} step={0.05}
+                        onChange={(e) => setOverrides({ ...overrides, weight_momentum: Number(e.target.value) })} />
+                    </div>
+                    <div>
+                      <Label className="mb-1 text-xs">변동성 기간 (일)</Label>
+                      <Input type="number" value={overrides.volatility_days} min={1} step={1}
+                        onChange={(e) => setOverrides({ ...overrides, volatility_days: Number(e.target.value) })} />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 mt-3">
+                    <label className="flex items-center gap-2 text-xs cursor-pointer">
+                      <input type="checkbox" checked={overrides.absolute_momentum_filter}
+                        onChange={(e) => setOverrides({ ...overrides, absolute_momentum_filter: e.target.checked })}
+                        className="rounded border-border" />
+                      절대 모멘텀 필터
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs whitespace-nowrap">임계값</Label>
+                      <Input type="number" value={overrides.abs_mom_threshold} step={0.01}
+                        className="w-24"
+                        onChange={(e) => setOverrides({ ...overrides, abs_mom_threshold: Number(e.target.value) })} />
+                    </div>
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      가중치 합: {((overrides.weight_value ?? 0) + (overrides.weight_quality ?? 0) + (overrides.weight_momentum ?? 0)).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Universe Filter */}
+                <div>
+                  <h4 className="text-xs font-medium text-muted-foreground mb-2">유니버스 필터</h4>
+                </div>
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label className="mb-1.5 text-xs">최소 주가 ($)</Label>

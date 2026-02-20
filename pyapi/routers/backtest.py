@@ -269,6 +269,12 @@ def run_backtest(req: BacktestRequest, secret: None = Depends(verify_secret)):
         if req.universe_codes and hasattr(strategy, "universe_codes"):
             strategy.universe_codes = req.universe_codes
 
+        if req.strategy_overrides:
+            overrides = req.strategy_overrides.model_dump(exclude_none=True)
+            for key, value in overrides.items():
+                if hasattr(strategy, key):
+                    setattr(strategy, key, value)
+
         from src.backtest.engine import BacktestEngine
         from src.backtest.analyzer import PerformanceAnalyzer
 

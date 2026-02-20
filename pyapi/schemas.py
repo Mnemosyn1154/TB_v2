@@ -18,6 +18,19 @@ class UniversePreviewRequest(BaseModel):
     min_market_cap: float = 5_000_000_000
 
 
+class StrategyOverrides(BaseModel):
+    top_n: Optional[int] = None
+    rebalance_months: Optional[int] = None
+    lookback_days: Optional[int] = None
+    momentum_days: Optional[int] = None
+    volatility_days: Optional[int] = None
+    weight_value: Optional[float] = None
+    weight_quality: Optional[float] = None
+    weight_momentum: Optional[float] = None
+    absolute_momentum_filter: Optional[bool] = None
+    abs_mom_threshold: Optional[float] = None
+
+
 class BacktestRequest(BaseModel):
     strategy: str
     start_date: str
@@ -27,6 +40,7 @@ class BacktestRequest(BaseModel):
     slippage_rate: float = 0.001
     pair_name: Optional[str] = None
     universe_codes: Optional[list[dict]] = None
+    strategy_overrides: Optional[StrategyOverrides] = None
 
 
 class ApiError(BaseModel):

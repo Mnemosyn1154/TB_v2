@@ -11,6 +11,19 @@ export interface UniverseStock {
   last_price: number;
 }
 
+export interface StrategyOverrides {
+  top_n?: number;
+  rebalance_months?: number;
+  lookback_days?: number;
+  momentum_days?: number;
+  volatility_days?: number;
+  weight_value?: number;
+  weight_quality?: number;
+  weight_momentum?: number;
+  absolute_momentum_filter?: boolean;
+  abs_mom_threshold?: number;
+}
+
 export interface BacktestRequest {
   strategy: string;
   start_date: string;
@@ -20,6 +33,7 @@ export interface BacktestRequest {
   slippage_rate?: number;
   pair_name?: string | null;
   universe_codes?: UniverseStock[] | null;
+  strategy_overrides?: StrategyOverrides | null;
 }
 
 export interface BacktestMetrics {
