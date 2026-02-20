@@ -8,6 +8,7 @@ from __future__ import annotations
 from loguru import logger
 
 from src.core.config import get_config, load_env
+from src.core.fx import get_fx_rate, get_usd_krw
 from src.core.risk_manager import RiskManager, Position
 
 
@@ -48,9 +49,11 @@ def _get_simulation_portfolio() -> dict:
     kr_positions = [_to_frontend_position(p) for p in positions if p["market"] == "KR"]
     us_positions = [_to_frontend_position(p) for p in positions if p["market"] == "US"]
 
-    # equity 재계산 (현재가 업데이트 후)
+    # equity 재계산 (현재가 업데이트 후, 모든 금액 KRW 기준)
     kr_equity = sum(p["current_price"] * p["quantity"] for p in positions if p["market"] == "KR")
-    us_equity = sum(p["current_price"] * p["quantity"] for p in positions if p["market"] == "US")
+    us_equity_usd = sum(p["current_price"] * p["quantity"] for p in positions if p["market"] == "US")
+    fx_rate = get_fx_rate("US")
+    us_equity = us_equity_usd * fx_rate
     total_equity = kr_equity + us_equity
     cash = summary["cash"]
     total_value = cash + total_equity
@@ -158,36 +161,6 @@ def _get_kis_portfolio() -> dict:
 
 
 # ──────────────────────────────────────────────
-# 환율
-# ──────────────────────────────────────────────
-
-_fx_cache: dict[str, tuple[float, float]] = {}  # pair → (rate, timestamp)
-_FX_TTL = 3600  # 1시간 캐시
-
-
-def get_usd_krw() -> float:
-    """USD/KRW 환율 조회 (yfinance, 1시간 캐시)"""
-    import time
-    cached = _fx_cache.get("USDKRW")
-    if cached and (time.time() - cached[1]) < _FX_TTL:
-        return cached[0]
-    try:
-        import yfinance as yf
-        ticker = yf.Ticker("USDKRW=X")
-        rate = ticker.fast_info.get("lastPrice", 0) or 0
-        if rate > 0:
-            _fx_cache["USDKRW"] = (rate, time.time())
-            logger.debug(f"USD/KRW 환율: {rate:,.1f}")
-            return rate
-    except Exception as e:
-        logger.warning(f"USD/KRW 환율 조회 실패: {e}")
-    # 캐시 남아있으면 만료돼도 사용
-    if cached:
-        return cached[0]
-    return 1350.0  # 최후 폴백
-
-
-# ──────────────────────────────────────────────
 # 헬퍼 함수
 # ──────────────────────────────────────────────
 
@@ -261,12 +234,17 @@ def _get_name(code: str, fallback: str = "") -> str:
 
 
 def _to_frontend_position(p: dict) -> dict:
-    """DB 포지션 → 프론트엔드 Position 형식"""
+    """DB 포지션 → 프론트엔드 Position 형식
+
+    profit_amt는 KRW 기준 (US 종목은 환율 적용)
+    """
     entry = p["entry_price"]
     current = p["current_price"]
     quantity = p["quantity"]
     code = p["code"]
-    profit_amt = (current - entry) * quantity
+    market = p["market"]
+    fx = get_fx_rate(market)
+    profit_amt = (current - entry) * quantity * fx
     profit_pct = ((current - entry) / entry * 100) if entry > 0 else 0
     return {
         "code": code,
@@ -276,7 +254,7 @@ def _to_frontend_position(p: dict) -> dict:
         "current_price": current,
         "profit_pct": round(profit_pct, 2),
         "profit_amt": round(profit_amt, 2),
-        "market": p["market"],
+        "market": market,
         "strategy": p.get("strategy", ""),
     }
 

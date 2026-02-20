@@ -25,6 +25,7 @@ from typing import Any
 from loguru import logger
 
 from src.core.config import get_config, DATA_DIR
+from src.core.fx import get_fx_rate
 
 _KILL_SWITCH_FILE = DATA_DIR / "kill_switch.json"
 
@@ -53,8 +54,8 @@ class Position:
 
     @property
     def market_value(self) -> float:
-        """현재 평가 금액"""
-        return self.current_price * self.quantity
+        """현재 평가 금액 (KRW 기준, US 종목은 환율 적용)"""
+        return self.current_price * self.quantity * get_fx_rate(self.market)
 
 
 @dataclass
@@ -309,7 +310,12 @@ class RiskManager:
 
     def calculate_position_size(self, price: float, market: str = "KR",
                                 strategy: str = "") -> int:
-        """적정 포지션 사이즈 계산 (동일 비중 기반, 전략별 자본 한도 반영)"""
+        """적정 포지션 사이즈 계산 (동일 비중 기반, 전략별 자본 한도 반영)
+
+        price: 해당 마켓의 원래 통화 가격 (KR=KRW, US=USD)
+        target_value: KRW 기준 목표 투자금
+        → US 종목의 경우 price를 KRW로 변환 후 수량 계산
+        """
         total = self.state.total_equity + self.state.cash
         if total == 0:
             # fallback: settings의 initial_capital 사용
@@ -323,17 +329,19 @@ class RiskManager:
         if price == 0:
             return 0
 
-        # 최대 비중의 80%로 보수적 사이징
+        # 최대 비중의 80%로 보수적 사이징 (KRW 기준)
         target_value = total * (self.max_position_pct / 100) * 0.8
 
-        # 전략별 자본 한도가 있으면 잔여 한도 이내로 제한
+        # 전략별 자본 한도가 있으면 잔여 한도 이내로 제한 (KRW 기준)
         budget = self._get_strategy_budget(strategy)
         if budget is not None:
             remaining = max(budget - self._get_strategy_used(strategy), 0)
             if target_value > remaining:
                 target_value = remaining
 
-        quantity = int(target_value / price)
+        # price를 KRW로 변환하여 수량 계산
+        price_krw = price * get_fx_rate(market)
+        quantity = int(target_value / price_krw)
 
         return max(quantity, 0)
 
