@@ -63,7 +63,7 @@ def _build_cache(config: dict) -> dict[str, str]:
             from src.core.universe import UniverseManager
 
             mgr = UniverseManager()
-            for stock in mgr._load_from_cache("sp500"):
+            for stock in mgr.load_from_cache("sp500"):
                 if stock.get("exchange"):
                     cache[stock["code"]] = stock["exchange"]
         except Exception as e:

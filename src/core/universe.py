@@ -102,17 +102,17 @@ class UniverseManager:
             try:
                 interval = config.get("refresh_interval_days", 7)
                 if self._is_cache_fresh(interval):
-                    return self._load_from_cache("sp500")
+                    return self.load_from_cache("sp500")
 
                 if config.get("auto_refresh", True):
                     return self.refresh(config)
 
-                cached = self._load_from_cache("sp500")
+                cached = self.load_from_cache("sp500")
                 if cached:
                     return cached
             except Exception as e:
                 logger.warning(f"S&P 500 유니버스 로딩 실패: {e}")
-                cached = self._load_from_cache("sp500")
+                cached = self.load_from_cache("sp500")
                 if cached:
                     logger.info(f"캐시에서 {len(cached)}개 종목 사용")
                     return cached
@@ -143,11 +143,11 @@ class UniverseManager:
         self._save_to_cache(stocks, "sp500")
         logger.info(f"S&P 500 유니버스 갱신 완료: {len(stocks)}개 종목")
 
-        return self._load_from_cache("sp500")
+        return self.load_from_cache("sp500")
 
     def get_status(self) -> dict:
         """캐시 상태 반환"""
-        cached = self._load_from_cache("sp500")
+        cached = self.load_from_cache("sp500")
         last_refresh = self._get_meta("sp500_last_refresh")
 
         age_days = None
@@ -302,7 +302,7 @@ class UniverseManager:
 
             conn.commit()
 
-    def _load_from_cache(self, source: str) -> list[dict]:
+    def load_from_cache(self, source: str) -> list[dict]:
         """DB 캐시에서 종목 목록 읽기"""
         with self.engine.connect() as conn:
             rows = conn.execute(text(
