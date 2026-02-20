@@ -123,3 +123,79 @@ class TestCacheFreshness:
         """interval=0이면 항상 not fresh"""
         mgr._save_to_cache([{"ticker": "X", "name": "X", "exchange": "NAS"}], "sp500")
         assert mgr._is_cache_fresh(0) is False
+
+
+class TestPreview:
+    """preview() — 캐시 저장 없이 필터링 결과만 반환"""
+
+    def test_preview_returns_filtered_stocks(self, mgr, monkeypatch):
+        """preview()가 필터링된 종목 리스트를 올바른 포맷으로 반환"""
+        monkeypatch.setattr(mgr, "_fetch_sp500_tickers", lambda: ["AAPL", "PENNY"])
+        monkeypatch.setattr(
+            mgr,
+            "_filter_and_enrich",
+            lambda tickers, filters: [
+                {"ticker": "AAPL", "name": "Apple", "exchange": "NAS",
+                 "sector": "Tech", "market_cap": 3e12, "avg_volume": 5e7, "last_price": 190},
+            ],
+        )
+
+        result = mgr.preview({"min_price": 10})
+        assert len(result) == 1
+        stock = result[0]
+        assert stock["code"] == "AAPL"
+        assert stock["market"] == "US"
+        assert stock["exchange"] == "NAS"
+        assert stock["name"] == "Apple"
+        assert stock["sector"] == "Tech"
+        assert stock["market_cap"] == 3e12
+        assert stock["last_price"] == 190
+
+    def test_preview_does_not_save_cache(self, mgr, monkeypatch):
+        """preview()는 캐시에 저장하지 않는다"""
+        monkeypatch.setattr(mgr, "_fetch_sp500_tickers", lambda: ["AAPL"])
+        monkeypatch.setattr(
+            mgr,
+            "_filter_and_enrich",
+            lambda tickers, filters: [
+                {"ticker": "AAPL", "name": "Apple", "exchange": "NAS"},
+            ],
+        )
+
+        mgr.preview()
+        assert mgr.load_from_cache("sp500") == []
+
+    def test_preview_passes_filters(self, mgr, monkeypatch):
+        """preview()가 filters dict를 _filter_and_enrich에 전달"""
+        captured = {}
+
+        def mock_filter(tickers, filters):
+            captured["filters"] = filters
+            return []
+
+        monkeypatch.setattr(mgr, "_fetch_sp500_tickers", lambda: ["AAPL"])
+        monkeypatch.setattr(mgr, "_filter_and_enrich", mock_filter)
+
+        mgr.preview({"min_price": 20, "min_market_cap": 1e10})
+        assert captured["filters"] == {"min_price": 20, "min_market_cap": 1e10}
+
+    def test_preview_default_filters(self, mgr, monkeypatch):
+        """filters=None이면 빈 dict 전달"""
+        captured = {}
+
+        def mock_filter(tickers, filters):
+            captured["filters"] = filters
+            return []
+
+        monkeypatch.setattr(mgr, "_fetch_sp500_tickers", lambda: ["AAPL"])
+        monkeypatch.setattr(mgr, "_filter_and_enrich", mock_filter)
+
+        mgr.preview()
+        assert captured["filters"] == {}
+
+    def test_preview_raises_on_empty_tickers(self, mgr, monkeypatch):
+        """Wikipedia fetch 실패 시 RuntimeError"""
+        monkeypatch.setattr(mgr, "_fetch_sp500_tickers", lambda: [])
+
+        with pytest.raises(RuntimeError, match="S&P 500"):
+            mgr.preview()

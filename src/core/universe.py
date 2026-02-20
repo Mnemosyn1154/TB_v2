@@ -145,6 +145,26 @@ class UniverseManager:
 
         return self.load_from_cache("sp500")
 
+    def preview(self, filters: dict | None = None) -> list[dict]:
+        """필터 파라미터로 S&P 500 프리뷰 (캐시 저장 안함)"""
+        tickers = self._fetch_sp500_tickers()
+        if not tickers:
+            raise RuntimeError("Wikipedia에서 S&P 500 목록을 가져올 수 없습니다")
+
+        stocks = self._filter_and_enrich(tickers, filters or {})
+        return [
+            {
+                "code": s["ticker"], "market": "US",
+                "exchange": s.get("exchange", "NYS"),
+                "name": s.get("name", ""),
+                "sector": s.get("sector", ""),
+                "market_cap": s.get("market_cap", 0),
+                "avg_volume": s.get("avg_volume", 0),
+                "last_price": s.get("last_price", 0),
+            }
+            for s in stocks
+        ]
+
     def get_status(self) -> dict:
         """캐시 상태 반환"""
         cached = self.load_from_cache("sp500")
@@ -171,7 +191,12 @@ class UniverseManager:
     def _fetch_sp500_tickers(self) -> list[str]:
         """Wikipedia에서 S&P 500 티커 목록 가져오기"""
         try:
-            tables = pd.read_html(_SP500_URL)
+            import urllib.request
+
+            req = urllib.request.Request(_SP500_URL, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                html = resp.read()
+            tables = pd.read_html(html)
             df = tables[0]
             tickers = df["Symbol"].tolist()
             # BRK.B → BRK-B (yfinance 호환)

@@ -266,6 +266,9 @@ def run_backtest(req: BacktestRequest, secret: None = Depends(verify_secret)):
             if available and req.pair_name in available:
                 strategy.filter_pairs([req.pair_name])
 
+        if req.universe_codes and hasattr(strategy, "universe_codes"):
+            strategy.universe_codes = req.universe_codes
+
         from src.backtest.engine import BacktestEngine
         from src.backtest.analyzer import PerformanceAnalyzer
 

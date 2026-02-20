@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends
 from loguru import logger
 
 from pyapi.deps import verify_secret
+from pyapi.schemas import UniversePreviewRequest
 
 router = APIRouter(prefix="/py", tags=["universe"])
 
@@ -52,6 +53,20 @@ def universe_refresh(_: None = Depends(verify_secret)):
         return {"data": {"refreshed": len(stocks)}, "error": None}
     except Exception as e:
         logger.error(f"universe refresh 실패: {e}")
+        return {"data": None, "error": str(e)}
+
+
+@router.post("/universe/preview")
+def universe_preview(req: UniversePreviewRequest, _: None = Depends(verify_secret)):
+    """커스텀 필터로 S&P 500 유니버스 프리뷰 (캐시 저장 안함)"""
+    try:
+        from src.core.universe import UniverseManager
+
+        mgr = UniverseManager()
+        stocks = mgr.preview(req.model_dump())
+        return {"data": stocks, "error": None}
+    except Exception as e:
+        logger.error(f"universe preview 실패: {e}")
         return {"data": None, "error": str(e)}
 
 

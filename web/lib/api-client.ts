@@ -116,6 +116,17 @@ export const getBacktestPeerComparison = (params: {
     body: JSON.stringify(params),
   });
 
+// Universe
+export const previewUniverse = (filters: {
+  min_price: number;
+  min_avg_daily_volume: number;
+  min_market_cap: number;
+}) =>
+  fetchApi("/universe/preview", {
+    method: "POST",
+    body: JSON.stringify(filters),
+  });
+
 // Bot
 export const runBot = () => fetchApi("/bot/run", { method: "POST" });
 export const collectData = () =>

@@ -1,5 +1,16 @@
 import type { Market, TradeSide } from "./common";
 
+export interface UniverseStock {
+  code: string;
+  market: string;
+  exchange: string;
+  name: string;
+  sector: string;
+  market_cap: number;
+  avg_volume: number;
+  last_price: number;
+}
+
 export interface BacktestRequest {
   strategy: string;
   start_date: string;
@@ -8,6 +19,7 @@ export interface BacktestRequest {
   commission_rate?: number;
   slippage_rate?: number;
   pair_name?: string | null;
+  universe_codes?: UniverseStock[] | null;
 }
 
 export interface BacktestMetrics {

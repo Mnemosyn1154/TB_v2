@@ -12,6 +12,12 @@ class ModeRequest(BaseModel):
     confirm: bool = False  # required for "live"
 
 
+class UniversePreviewRequest(BaseModel):
+    min_price: float = 10
+    min_avg_daily_volume: float = 10_000_000
+    min_market_cap: float = 5_000_000_000
+
+
 class BacktestRequest(BaseModel):
     strategy: str
     start_date: str
@@ -20,6 +26,7 @@ class BacktestRequest(BaseModel):
     commission_rate: float = 0.00015
     slippage_rate: float = 0.001
     pair_name: Optional[str] = None
+    universe_codes: Optional[list[dict]] = None
 
 
 class ApiError(BaseModel):
