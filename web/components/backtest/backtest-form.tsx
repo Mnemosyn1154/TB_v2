@@ -29,6 +29,18 @@ export function BacktestForm({ strategies, onRun, loading }: BacktestFormProps) 
   const [startDate, setStartDate] = useState("2024-01-01");
   const [endDate, setEndDate] = useState("2025-12-31");
   const [initialCapital, setInitialCapital] = useState(50_000_000);
+  const [capitalDisplay, setCapitalDisplay] = useState(
+    (50_000_000).toLocaleString("en-US")
+  );
+
+  const handleCapitalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/,/g, "");
+    if (raw === "" || /^\d+$/.test(raw)) {
+      const num = raw === "" ? 0 : Number(raw);
+      setInitialCapital(num);
+      setCapitalDisplay(raw === "" ? "" : num.toLocaleString("en-US"));
+    }
+  };
   const [pairName, setPairName] = useState<string | null>(null);
   const [pairs, setPairs] = useState<string[]>([]);
 
@@ -134,11 +146,11 @@ export function BacktestForm({ strategies, onRun, loading }: BacktestFormProps) 
           <div>
             <Label className="mb-1.5 text-xs">초기 자본금</Label>
             <Input
-              type="number"
-              value={initialCapital}
-              onChange={(e) => setInitialCapital(Number(e.target.value))}
-              step={1_000_000}
-              min={1_000_000}
+              type="text"
+              inputMode="numeric"
+              value={capitalDisplay}
+              onChange={handleCapitalChange}
+              placeholder="50,000,000"
             />
             <span className="text-xs text-muted-foreground">
               {formatNumber(initialCapital)}원
