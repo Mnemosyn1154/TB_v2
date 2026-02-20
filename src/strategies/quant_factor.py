@@ -30,7 +30,9 @@ Used by:
 
 Modification Guide:
     - 팩터 추가: _calculate_factors()에 새 팩터 계산 추가 + settings.yaml weights에 가중치 추가
-    - 유니버스 변경: settings.yaml의 quant_factor.universe_codes 수정
+    - 유니버스 변경: settings.yaml의 quant_factor.universe 블록 수정
+      source: sp500 → S&P 500 자동 갱신, manual → manual_codes 사용
+      legacy universe_codes도 하위 호환 지원
     - 리밸런싱 주기: rebalance_months 조정
 """
 from typing import Any
@@ -78,7 +80,19 @@ class QuantFactorStrategy(BaseStrategy):
         self.safe_asset_exchange: str = qf_config.get("safe_asset_exchange", "")
 
         # 유니버스 종목 코드
-        self.universe_codes: list[dict] = qf_config.get("universe_codes", [])
+        universe_cfg = qf_config.get("universe", {})
+        legacy_codes = qf_config.get("universe_codes", [])
+
+        if not universe_cfg and legacy_codes:
+            # 하위 호환: 테스트 등에서 기존 universe_codes 사용
+            self._universe_source = "manual"
+            self.universe_codes: list[dict] = legacy_codes
+        elif universe_cfg.get("source") == "sp500":
+            self._universe_source = "sp500"
+            self.universe_codes = self._load_sp500_universe(universe_cfg)
+        else:
+            self._universe_source = "manual"
+            self.universe_codes = universe_cfg.get("manual_codes", legacy_codes)
 
         # 현재 상태
         self.current_holdings: set[str] = set()
@@ -386,6 +400,23 @@ class QuantFactorStrategy(BaseStrategy):
             }
 
         return result
+
+    def _load_sp500_universe(self, universe_cfg: dict) -> list[dict]:
+        """S&P 500 유니버스 로딩, 실패 시 manual_codes fallback"""
+        try:
+            from src.core.universe import UniverseManager
+
+            mgr = UniverseManager()
+            stocks = mgr.get_stocks(universe_cfg)
+            if stocks:
+                logger.info(f"S&P 500 유니버스 로딩: {len(stocks)}개 종목")
+                return stocks
+        except Exception as e:
+            logger.warning(f"S&P 500 유니버스 로딩 실패: {e}")
+
+        fallback = universe_cfg.get("manual_codes", [])
+        logger.info(f"manual_codes fallback: {len(fallback)}개 종목")
+        return fallback
 
     def _get_market(self, code: str) -> str:
         """종목 코드로 시장 판별"""

@@ -16,7 +16,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-from pyapi.routers import portfolio, backtest, bot, signals, paper, benchmark
+from pyapi.routers import portfolio, backtest, bot, signals, paper, benchmark, universe
 
 
 @asynccontextmanager
@@ -61,6 +61,7 @@ app.include_router(bot.router)
 app.include_router(signals.router)
 app.include_router(paper.router)
 app.include_router(benchmark.router)
+app.include_router(universe.router)
 
 
 @app.get("/py/health")
