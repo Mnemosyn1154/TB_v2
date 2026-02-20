@@ -345,9 +345,15 @@ export function BacktestForm({ strategies, onRun, loading }: BacktestFormProps) 
                         className="w-24"
                         onChange={(e) => setOverrides({ ...overrides, abs_mom_threshold: Number(e.target.value) })} />
                     </div>
-                    <span className="text-xs text-muted-foreground ml-auto">
-                      가중치 합: {((overrides.weight_value ?? 0) + (overrides.weight_quality ?? 0) + (overrides.weight_momentum ?? 0)).toFixed(2)}
-                    </span>
+                    {(() => {
+                      const sum = (overrides.weight_value ?? 0) + (overrides.weight_quality ?? 0) + (overrides.weight_momentum ?? 0);
+                      const isOne = Math.abs(sum - 1) < 0.001;
+                      return (
+                        <span className={`text-xs ml-auto ${isOne ? "text-muted-foreground" : "text-destructive font-medium"}`}>
+                          가중치 합: {sum.toFixed(2)}{!isOne && " ⚠ 합이 1이 아닙니다"}
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
 
