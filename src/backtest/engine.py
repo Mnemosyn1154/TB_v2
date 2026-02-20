@@ -28,6 +28,7 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
+from src.core.fx import get_fx_rate
 from src.core.risk_manager import RiskManager, Position
 from src.strategies.base import BaseStrategy, TradeSignal, Signal
 
@@ -288,13 +289,16 @@ class BacktestEngine:
             self._execute_sell(date, signal, price)
 
     def _execute_buy(self, date: str, signal: TradeSignal, price: float) -> None:
-        """매수 가상 체결"""
+        """매수 가상 체결 (cash는 KRW, US 종목은 환율 적용)"""
         # 이미 보유 중이면 스킵 (중복 방지)
         if signal.code in self.positions:
             return
 
         # 슬리피지 반영 (매수 시 불리하게)
         exec_price = price * (1 + self.slippage_rate)
+
+        # 환율 (US → KRW)
+        fx = get_fx_rate(signal.market)
 
         # 포지션 사이즈 계산
         quantity = signal.quantity
@@ -303,28 +307,31 @@ class BacktestEngine:
         if quantity <= 0:
             return
 
-        # 총 비용
-        gross_amount = exec_price * quantity
-        commission = gross_amount * self.commission_rate
-        net_amount = gross_amount + commission
+        # 총 비용 (KRW 기준)
+        gross_amount_native = exec_price * quantity
+        gross_amount_krw = gross_amount_native * fx
+        commission = gross_amount_krw * self.commission_rate
+        net_amount = gross_amount_krw + commission
 
-        # 현금 체크
+        # 현금 체크 (KRW)
         if net_amount > self.cash:
             # 현금 내에서 가능한 수량으로 조정
-            quantity = int(self.cash * 0.95 / (exec_price * (1 + self.commission_rate)))
+            price_krw = exec_price * fx
+            quantity = int(self.cash * 0.95 / (price_krw * (1 + self.commission_rate)))
             if quantity <= 0:
                 return
-            gross_amount = exec_price * quantity
-            commission = gross_amount * self.commission_rate
-            net_amount = gross_amount + commission
+            gross_amount_native = exec_price * quantity
+            gross_amount_krw = gross_amount_native * fx
+            commission = gross_amount_krw * self.commission_rate
+            net_amount = gross_amount_krw + commission
 
-        # 리스크 검증
-        can_trade, reason = self.risk_manager.can_open_position(signal.code, gross_amount)
+        # 리스크 검증 (KRW 기준)
+        can_trade, reason = self.risk_manager.can_open_position(signal.code, gross_amount_krw)
         if not can_trade:
             logger.debug(f"[BT] 리스크 거부: {signal.code} — {reason}")
             return
 
-        # 체결
+        # 체결 (cash는 KRW)
         self.cash -= net_amount
         self.positions[signal.code] = {
             "quantity": quantity,
@@ -360,7 +367,7 @@ class BacktestEngine:
         self.strategy.on_trade_executed(signal, success=True)
 
     def _execute_sell(self, date: str, signal: TradeSignal, price: float) -> None:
-        """매도/청산 가상 체결"""
+        """매도/청산 가상 체결 (cash는 KRW, US 종목은 환율 적용)"""
         pos = self.positions.get(signal.code)
         if pos is None:
             return
@@ -368,18 +375,22 @@ class BacktestEngine:
         quantity = pos["quantity"]
         entry_price = pos["entry_price"]
         entry_date = pos["entry_date"]
+        market = pos["market"]
 
         # 슬리피지 반영 (매도 시 불리하게)
         exec_price = price * (1 - self.slippage_rate)
 
-        gross_amount = exec_price * quantity
-        commission = gross_amount * self.commission_rate
-        net_amount = gross_amount - commission
+        # 환율 (US → KRW)
+        fx = get_fx_rate(market)
 
-        # 손익 계산
-        cost_basis = entry_price * quantity
-        pnl = net_amount - cost_basis - (cost_basis * self.commission_rate)
-        pnl_pct = pnl / cost_basis * 100 if cost_basis > 0 else 0.0
+        gross_amount_krw = exec_price * quantity * fx
+        commission = gross_amount_krw * self.commission_rate
+        net_amount = gross_amount_krw - commission
+
+        # 손익 계산 (KRW 기준)
+        cost_basis_krw = entry_price * quantity * fx
+        pnl = net_amount - cost_basis_krw - (cost_basis_krw * self.commission_rate)
+        pnl_pct = pnl / cost_basis_krw * 100 if cost_basis_krw > 0 else 0.0
 
         # 보유일수
         try:
@@ -389,7 +400,7 @@ class BacktestEngine:
         except Exception:
             holding_days = 0
 
-        # 체결
+        # 체결 (cash는 KRW)
         self.cash += net_amount
         del self.positions[signal.code]
 
@@ -452,9 +463,10 @@ class BacktestEngine:
             self._execute_sell(date, signal, day_prices[code])
 
     def _calculate_equity(self, day_prices: dict[str, float]) -> float:
-        """현재 총 자산 계산 (현금 + 포지션 평가)"""
+        """현재 총 자산 계산 (현금 + 포지션 평가, 모두 KRW 기준)"""
         positions_value = sum(
             pos["quantity"] * day_prices.get(code, pos["current_price"])
+            * get_fx_rate(pos["market"])
             for code, pos in self.positions.items()
         )
         return self.cash + positions_value

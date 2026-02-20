@@ -25,6 +25,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
 from src.core.config import get_config, DATA_DIR
+from src.core.fx import get_fx_rate, to_krw
 
 
 class PortfolioTracker:
@@ -225,24 +226,29 @@ class PortfolioTracker:
         """
         매수 실행: 현금 차감 + 포지션 추가 (단일 트랜잭션).
         현금 부족이면 False.
+
+        price는 해당 마켓의 원래 통화(KR=KRW, US=USD),
+        현금(cash)은 항상 KRW이므로 US 매수 시 환율 변환 적용.
         """
-        cost = price * quantity
+        fx = get_fx_rate(market)
+        cost_krw = price * quantity * fx
         cash = self.get_cash()
-        if cash < cost:
+        if cash < cost_krw:
             logger.warning(f"시뮬레이션 매수 실패 — 현금 부족: "
-                           f"필요 {cost:,.0f}, 보유 {cash:,.0f}")
+                           f"필요 {cost_krw:,.0f}원, 보유 {cash:,.0f}원"
+                           f"{f' (환율 {fx:,.0f})' if market == 'US' else ''}")
             return False
 
         now = datetime.now().isoformat()
-        new_cash = cash - cost
+        new_cash = cash - cost_krw
         with self.engine.begin() as conn:
-            # 현금 차감
+            # 현금 차감 (KRW)
             conn.execute(text("""
                 INSERT INTO sim_portfolio (key, value, updated_at)
                 VALUES ('cash', :val, :now)
                 ON CONFLICT(key) DO UPDATE SET value = :val, updated_at = :now
             """), {"val": str(new_cash), "now": now})
-            # 포지션 추가
+            # 포지션 추가 (price는 원래 통화로 저장)
             conn.execute(text("""
                 INSERT INTO sim_positions
                     (code, market, side, quantity, entry_price, current_price, strategy, entry_time, updated_at)
@@ -255,26 +261,31 @@ class PortfolioTracker:
                 "code": code, "market": market, "qty": quantity,
                 "ep": price, "strat": strategy, "et": now, "now": now,
             })
-        logger.info(f"시뮬레이션 매수: {code} x{quantity} @ {price:,.2f} "
-                    f"(비용 {cost:,.0f}, 잔여 현금 {new_cash:,.0f})")
+        logger.info(f"시뮬레이션 매수: {code} x{quantity} @ {price:,.2f}"
+                    f"{' USD' if market == 'US' else ' KRW'} "
+                    f"(비용 {cost_krw:,.0f}원, 잔여 현금 {new_cash:,.0f}원)")
         return True
 
     def execute_sell(self, code: str, price: float) -> float:
         """
         매도 실행: 포지션 제거 + 현금 가산 (단일 트랜잭션).
-        반환: 매도 수입 금액. 포지션 미보유 시 0.0.
+        반환: 매도 수입 금액 (KRW). 포지션 미보유 시 0.0.
+
+        price는 해당 마켓의 원래 통화, 현금 가산 시 KRW 변환.
         """
         pos = self.get_position(code)
         if not pos:
             logger.warning(f"시뮬레이션 매도 실패 — 포지션 없음: {code}")
             return 0.0
 
-        proceeds = price * pos["quantity"]
+        market = pos["market"]
+        fx = get_fx_rate(market)
+        proceeds_krw = price * pos["quantity"] * fx
         cash = self.get_cash()
-        new_cash = cash + proceeds
+        new_cash = cash + proceeds_krw
         now = datetime.now().isoformat()
         with self.engine.begin() as conn:
-            # 현금 가산
+            # 현금 가산 (KRW)
             conn.execute(text("""
                 INSERT INTO sim_portfolio (key, value, updated_at)
                 VALUES ('cash', :val, :now)
@@ -285,19 +296,23 @@ class PortfolioTracker:
                 text("DELETE FROM sim_positions WHERE code = :code"),
                 {"code": code},
             )
-        logger.info(f"시뮬레이션 매도: {code} x{pos['quantity']} @ {price:,.2f} "
-                    f"(수입 {proceeds:,.0f}, 잔여 현금 {new_cash:,.0f})")
-        return proceeds
+        logger.info(f"시뮬레이션 매도: {code} x{pos['quantity']} @ {price:,.2f}"
+                    f"{' USD' if market == 'US' else ' KRW'} "
+                    f"(수입 {proceeds_krw:,.0f}원, 잔여 현금 {new_cash:,.0f}원)")
+        return proceeds_krw
 
     # ──────────────────────────────────────────────
     # 조회
     # ──────────────────────────────────────────────
 
     def get_portfolio_summary(self) -> dict:
-        """포트폴리오 요약"""
+        """포트폴리오 요약 (모든 금액 KRW 기준)"""
         positions = self.get_all_positions()
         cash = self.get_cash()
-        total_equity = sum(p["current_price"] * p["quantity"] for p in positions)
+        total_equity = sum(
+            p["current_price"] * p["quantity"] * get_fx_rate(p["market"])
+            for p in positions
+        )
         return {
             "initial_capital": self.get_initial_capital(),
             "cash": cash,
@@ -387,7 +402,10 @@ def sync_risk_manager(risk_manager, tracker: PortfolioTracker) -> None:
         for p in positions
     ]
 
-    total_equity = sum(p["current_price"] * p["quantity"] for p in positions)
+    total_equity = sum(
+        p["current_price"] * p["quantity"] * get_fx_rate(p["market"])
+        for p in positions
+    )
     risk_manager.update_equity(total_equity, cash)
     logger.info(f"RiskManager 동기화: 포지션 {len(positions)}개, "
                 f"현금 {cash:,.0f}, 주식평가 {total_equity:,.0f}")
