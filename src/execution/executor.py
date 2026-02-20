@@ -29,6 +29,7 @@ from src.core.broker import KISBroker
 from src.core.config import get_config
 from src.core.data_manager import DataManager
 from src.core.exchange import get_us_exchange
+from src.core.fx import get_fx_rate
 from src.core.portfolio_tracker import PortfolioTracker
 from src.core.risk_manager import RiskManager, Position
 from src.strategies.base import BaseStrategy, TradeSignal, Signal
@@ -163,11 +164,11 @@ class OrderExecutor:
             logger.warning(f"포지션 사이즈 0, 매수 스킵: {signal.code}")
             return
 
-        market_value = price * quantity
+        market_value_krw = price * quantity * get_fx_rate(signal.market)
 
-        # 3. 리스크 검증
+        # 3. 리스크 검증 (KRW 기준)
         can_trade, reason = self.risk_manager.can_open_position(
-            signal.code, market_value, signal.strategy
+            signal.code, market_value_krw, signal.strategy
         )
         if not can_trade:
             logger.warning(f"리스크 거부: {reason}")
