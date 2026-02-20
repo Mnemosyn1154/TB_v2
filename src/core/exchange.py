@@ -54,11 +54,33 @@ def _build_cache(config: dict) -> dict[str, str]:
         cache[dm["safe_us_etf"]] = dm["safe_us_etf_exchange"]
 
     # 3. QuantFactor universe
-    for item in strategies.get("quant_factor", {}).get("universe_codes", []):
+    qf = strategies.get("quant_factor", {})
+    universe_cfg = qf.get("universe", {})
+    source = universe_cfg.get("source", "manual")
+
+    if source == "sp500":
+        try:
+            from src.core.universe import UniverseManager
+
+            mgr = UniverseManager()
+            for stock in mgr.load_from_cache("sp500"):
+                if stock.get("exchange"):
+                    cache[stock["code"]] = stock["exchange"]
+        except Exception as e:
+            logger.warning(f"universe_cache 로드 실패: {e}")
+
+    # manual_codes / legacy fallback도 항상 읽기
+    for item in universe_cfg.get("manual_codes", qf.get("universe_codes", [])):
         if item.get("market") == "US" and item.get("exchange"):
             cache[item["code"]] = item["exchange"]
 
     return cache
+
+
+def reset_exchange_cache() -> None:
+    """거래소 캐시 초기화 (유니버스 갱신 후 호출)"""
+    global _EXCHANGE_CACHE
+    _EXCHANGE_CACHE = None
 
 
 def get_us_exchange(ticker: str, purpose: str = "query") -> str:
