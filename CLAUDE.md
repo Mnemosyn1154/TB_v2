@@ -101,7 +101,7 @@ TB_v2/
 ├── main.py                  # CLI 진입점 (run, status, collect, backtest, backtest-yf)
 ├── config/settings.yaml     # 전략/리스크/브로커 설정 (YAML)
 ├── src/                     # Python 코어 엔진
-│   ├── core/                # KIS 브로커, 설정 로더, DB, 리스크 관리
+│   ├── core/                # KIS 브로커, 설정 로더, DB, 리스크 관리, 환율(fx), 유니버스
 │   ├── strategies/          # 6개 전략 (BaseStrategy 플러그인 시스템)
 │   ├── execution/           # 데이터 수집 + 주문 실행
 │   ├── backtest/            # 백테스트 엔진 + 성과 분석
@@ -109,7 +109,7 @@ TB_v2/
 ├── pyapi/                   # FastAPI 서버 (src/ 래핑)
 │   ├── main.py              # FastAPI 앱 (CORS, 라우터 등록, lifespan 스케줄러)
 │   ├── scheduler.py         # APScheduler 래퍼 (start/stop/status, 장중 체크)
-│   ├── routers/             # portfolio, backtest, bot, signals, paper, benchmark
+│   ├── routers/             # portfolio, backtest, bot, signals, paper, benchmark, universe
 │   ├── deps.py              # verify_secret (X-Internal-Secret 검증)
 │   └── schemas.py           # BacktestRequest, ExecuteRequest
 ├── web/                     # Next.js 프론트엔드
@@ -121,9 +121,10 @@ TB_v2/
 │   ├── lib/                 # api-client, python-proxy, formatters, strategy-utils
 │   └── types/               # 도메인별 TypeScript 타입 정의
 ├── tests/                   # pytest 테스트
-│   ├── conftest.py          # 공통 fixture (in-memory SQLite tracker)
-│   ├── test_simulation_e2e.py  # 시뮬레이션 E2E (매수/매도/P&L/스냅샷)
-│   └── test_strategies.py   # 전략 유닛 테스트 (StatArb/DualMomentum/QuantFactor/VolatilityBreakout/BollingerBand)
+│   ├── conftest.py          # 공통 fixture (in-memory SQLite tracker, FX mock)
+│   ├── test_simulation_e2e.py  # 시뮬레이션 E2E (매수/매도/P&L/스냅샷, KR/US/혼합)
+│   ├── test_strategies.py   # 전략 유닛 테스트 (StatArb/DualMomentum/QuantFactor/VolatilityBreakout/BollingerBand)
+│   └── test_universe.py     # UniverseManager 캐시/fallback/TTL 테스트
 ├── dashboard/               # Streamlit 레거시 UI
 │   └── services/            # 비즈니스 로직 (일부 pyapi에서 import)
 ├── deploy/                  # systemd/launchd 서비스, Cloudflare Tunnel, deploy.sh
@@ -196,15 +197,21 @@ python3 main.py backtest-yf -s stat_arb --start 2020-01-01 --end 2024-12-31
 - **활성 전략** (settings.yaml `enabled: true`): dual_momentum, quant_factor, volatility_breakout, bollinger_band
 - **비활성 전략**: stat_arb, sector_rotation (각 `enabled: false`)
 - **백테스트 리스크**: 백테스트 모드에서 MDD/킬스위치/일일손실 체크 자동 비활성화
-- **테스트**: 94 tests 통과 (`python -m pytest tests/`)
-  - `tests/test_simulation_e2e.py` — PortfolioTracker E2E (13 tests)
+- **테스트**: 109 tests 통과 (`python -m pytest tests/`)
+  - `tests/test_simulation_e2e.py` — PortfolioTracker E2E + KR/US/혼합 포트폴리오 (16 tests)
   - `tests/test_strategies.py` — StatArb/DualMomentum/QuantFactor/AbsMomentum/SectorRotation/VolatilityBreakout/BollingerBand 유닛 (71 tests)
   - `tests/test_risk_manager.py` — RiskManager 자본 배분 및 리스크 검증 (10 tests)
+  - `tests/test_universe.py` — UniverseManager 캐시 CRUD/fallback/TTL (12 tests)
 - **KIS 실전 거래 연동**: 모드 전환, KIS 상태 조회, 주문 내역 API 구현
 - **전략 카드 드래그 앤 드롭**: @dnd-kit 기반 순서 변경
 - **Settings API**: Python API 없이 Next.js에서 settings.yaml 직접 읽기/쓰기
 - **전략 편집**: StrategyEditor에서 숫자/문자열 파라미터, pairs, universe_codes 편집 가능
 - **백테스트**: inf/NaN 안전 직렬화, 사람이 읽을 수 있는 실행 로그 제공
+- **USD/KRW 환율 처리**: `src/core/fx.py` 중앙화 — yfinance 1시간 캐시 + fallback (1350.0)
+  - 포트폴리오/백테스트/리스크매니저/실행기 전체 KRW 기준 통일
+- **S&P 500 유니버스 자동 갱신**: `src/core/universe.py` — Wikipedia + yfinance 2단계 필터
+  - SQLite 캐시 (TTL 7일), quant_factor 전략 US only 전환
+  - API: `GET /py/universe/status`, `POST /py/universe/refresh`, `GET /py/universe/stocks`
 - **대시보드 UX**: 토스트 에러 알림, bot/run 후 캐시 자동 무효화
 
 ## 문서 인덱스
@@ -222,5 +229,4 @@ python3 main.py backtest-yf -s stat_arb --start 2020-01-01 --end 2024-12-31
 | `docs/SIMULATION_ISSUES.md` | 시뮬레이션 이슈 분석 & 수정 이력 (Phase 1-4 완료) |
 | `docs/DESIGN_SYSTEM.md` | 디자인 토큰, 색상, 타이포그래피 |
 | `docs/USER_MANUAL.md` | 사용자 매뉴얼 (대시보드 사용법, 전략 소개) |
-| `docs/REFACTORING_ANALYSIS.md` | 코드베이스 리팩토링 분석 |
 | `src/*/README.md` | 모듈별 문서 (5개 파일) |
